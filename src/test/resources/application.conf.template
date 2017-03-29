@@ -1,0 +1,4 @@
+spanner {
+  instance=""
+  database=""
+}
