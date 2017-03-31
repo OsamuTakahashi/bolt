@@ -1,6 +1,6 @@
 # Bolt
 
-The wrapper to use INSERT/UPDATE/DELETE sql query on Google Cloud Spanner.
+The wrapper for using INSERT/UPDATE/DELETE sql query on Google Cloud Spanner.
 
 ## How to
 
