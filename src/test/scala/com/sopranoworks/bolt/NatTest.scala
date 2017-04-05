@@ -154,13 +154,41 @@ class NatTest extends Specification with BeforeAfterEach {
 
       _dbClient.get.executeQuery("DELETE FROM test_tbl01 WHERE id=101 OR id=104;")
 
-      val resSet2 = _dbClient.get.singleUse().executeQuery(Statement.of("SELECT * FROM test_tbl01"))
+      val resSet2 = _dbClient.get.executeQuery("SELECT * FROM test_tbl01")
 
       var count = 0
       while(resSet2.next()) {
         count += 1
       }
       count must_== 2
+    }
+  }
+  "beginTransaction" should {
+    "normally success" in {
+      _dbClient.get.executeQuery("INSERT INTO test_tbl01 VALUES(101,'user1');")
+      _dbClient.get.executeQuery("INSERT INTO test_tbl01 VALUES(102,'user2');")
+      _dbClient.get.executeQuery("INSERT INTO test_tbl01 VALUES(103,'user3');")
+
+      _dbClient.get.beginTransaction {
+        db =>
+          val resSet = db.sql("SELECT * FROM test_tbl01;")
+          while(resSet.next()) {
+            db.sql(s"UPDATE test_tbl01 set name='new name' WHERE id=${resSet.getLong(0)};")
+        }
+      }
+
+      val resSet2 = _dbClient.get.executeQuery("SELECT * FROM test_tbl01 WHERE name='new name';")
+
+      var count = 0
+//      for {
+//        r<-resSet2
+//      } yield {
+//        count += 1
+//      }
+      while(resSet2.next()) {
+        count += 1
+      }
+      count must_== 3
     }
   }
 }

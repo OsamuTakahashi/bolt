@@ -2,6 +2,7 @@ parser grammar MiniSqlParser;
 options { tokenVocab=MiniSqlLexer; }
 
 @header {
+import com.google.cloud.spanner.ResultSet;
 }
 
 @members {
@@ -10,23 +11,36 @@ options { tokenVocab=MiniSqlLexer; }
 }
 
 
-minisql
-        : insert_stmt
-        | update_stmt
-        | delete_stmt
+minisql returns [ ResultSet resultSet = null ]
+        : insert_stmt { $resultSet = $insert_stmt.resultSet; }
+        | update_stmt { $resultSet = $update_stmt.resultSet; }
+        | delete_stmt { $resultSet = $delete_stmt.resultSet; }
+        | select_stmt
+        | create_stmt
         ;
 
-insert_stmt locals [
-              List<String> values = new ArrayList<String>();
+select_stmt /* throws NativeSqlException */
+        : SELECT { /*throw new NativeSqlException()*/nat.useNative(); }
+        ;
+
+insert_stmt returns [ ResultSet resultSet = null ]
+            locals [
+              List<String> columns = new ArrayList<String>(),
+              List<String> values = new ArrayList<String>()
             ]
-        : INSERT INTO? ID
+        : INSERT INTO? ID ( '(' ID { $columns.add($ID.text); } (',' ID { $columns.add($ID.text); } )*  ')' )?
             VALUES '(' value { $values.add($value.v.text()); } (',' value { $values.add($value.v.text()); } )* ')' ';'? {
-              nat.insert($ID.text,$values);
+              if ($columns.size() == 0)
+                nat.insert($ID.text,$values);
+              else
+                nat.insert($ID.text,$columns,$values);
             }
         ;
 
-update_stmt locals [
-              List<KeyValue> kvs = new ArrayList<KeyValue>();
+update_stmt
+            returns [ ResultSet resultSet = null ]
+            locals [
+              List<KeyValue> kvs = new ArrayList<KeyValue>()
             ]
         : UPDATE ID { currentTable = $ID.text; } SET ID EQ value { $kvs.add(new KeyValue($ID.text,$value.v.text())); } ( ',' ID EQ value { $kvs.add(new KeyValue($ID.text,$value.v.text())); } )* where_stmt ( LIMIT ln=INT )? ';'? {
             if ($where_stmt.where.onlyPrimaryKey()) {
@@ -41,10 +55,16 @@ update_stmt locals [
           }
         ;
 
-delete_stmt locals [ Where where = null; ]
-        : DELETE FROM ID { currentTable = $ID.text; } (where_stmt { $where = $where_stmt.where; })? {
+delete_stmt
+            returns [ ResultSet resultSet = null ]
+            locals [ Where where = null ]
+        : DELETE FROM ID { currentTable = $ID.text; } (where_stmt { $where = $where_stmt.where; })? ';'? {
             nat.delete(currentTable,$where);
           }
+        ;
+
+create_stmt /* throws NativeSqlException */
+        : CREATE { /*throw new NativeSqlException()*/nat.useNative(); }
         ;
 
 value returns [ Value v = null ]
@@ -96,4 +116,6 @@ cond returns [ String text = null ]
         | LT { $text = $LT.text; }
         | GEQ { $text = $GEQ.text; }
         | LEQ { $text = $LEQ.text; }
+        | LIKE { $text = $LIKE.text; }
+        | NOT LIKE { $text = "NOT LIKE"; }
         ;

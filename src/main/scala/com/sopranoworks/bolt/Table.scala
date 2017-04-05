@@ -11,11 +11,11 @@ class Table(dbClient:DatabaseClient,name:String) {
   private var _columnTypes = Map.empty[String,String]
   private var _key:Option[String] = None
 
-  def key:String =
+  def key:String =  synchronized {
     _key.getOrElse {
       val resultSet = dbClient.singleUse().executeQuery(Statement.of(s"SELECT * FROM INFORMATION_SCHEMA.INDEX_COLUMNS AS t WHERE t.TABLE_NAME='$name'"))
       var key = ""
-      while(_key.isEmpty && resultSet.next()) {
+      while (_key.isEmpty && resultSet.next()) {
         if (resultSet.getString("INDEX_NAME") == "PRIMARY_KEY") {
           key = resultSet.getString("COLUMN_NAME")
           _key = Some(key)
@@ -24,6 +24,7 @@ class Table(dbClient:DatabaseClient,name:String) {
       }
       key
     }
+  }
 
   def isKey(name:String):Boolean = key == name
 
@@ -32,20 +33,23 @@ class Table(dbClient:DatabaseClient,name:String) {
     _columnTypes.get(columnName)
   }
 
-  def columns:List[String] = _columns.getOrElse {
-    val resultSet = dbClient.singleUse().executeQuery(Statement.of(s"SELECT * FROM INFORMATION_SCHEMA.COLUMNS AS t WHERE t.TABLE_NAME='$name'"))
-    var columns = List.empty[String]
+  def columns:List[String] = synchronized {
+    _columns.getOrElse {
+      val resultSet = dbClient.singleUse().executeQuery(Statement.of(s"SELECT * FROM INFORMATION_SCHEMA.COLUMNS AS t WHERE t.TABLE_NAME='$name'"))
+      var columns = List.empty[String]
 
-    while(resultSet.next()) {
-      val nm = resultSet.getString("COLUMN_NAME")
-      val tp = resultSet.getString("SPANNER_TYPE")
-      columns ::= nm
-      _columnTypes += (nm->tp)
+      while(resultSet.next()) {
+        val nm = resultSet.getString("COLUMN_NAME")
+        val tp = resultSet.getString("SPANNER_TYPE")
+        columns ::= nm
+        _columnTypes += (nm->tp)
+      }
+      columns = columns.reverse
+      _columns = Some(columns)
+      columns
     }
-    columns = columns.reverse
-    _columns = Some(columns)
-    columns
   }
+
 
   def column(idx:Int):String = columns(idx)
 }

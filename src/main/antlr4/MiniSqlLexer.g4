@@ -27,6 +27,12 @@ fragment X:('x'|'X');
 fragment Y:('y'|'Y');
 fragment Z:('z'|'Z');
 
+CREATE  : C R E A T E
+        ;
+
+SELECT  : S E L E C T
+        ;
+
 INSERT  : I N S E R T
         ;
 
@@ -69,22 +75,25 @@ NOT     : N O T
 XOR     : X O R
         ;
 
+LIKE    : L I K E
+        ;
+
 EQ      : '='
         ;
 
 NEQ     : '<>'
         ;
 
-GEQ     : '<='
+LEQ     : '<='
         ;
 
-LEQ     : '=>'
+GEQ     : '=>'
         ;
 
-GT      : '<'
+LT      : '<'
         ;
 
-LT      : '>'
+GT      : '>'
         ;
 
 BG      : '('
@@ -97,6 +106,9 @@ SC      : ';'
         ;
 
 CN      : ','
+        ;
+
+AR      : '*'
         ;
 
 ID      : [a-zA-Z_][a-zA-Z0-9_]*

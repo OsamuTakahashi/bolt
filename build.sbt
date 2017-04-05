@@ -25,7 +25,7 @@ val commonLibraries = Seq(
 
 parallelExecution in ThisBuild := false
 
-val projectVersion = "0.1"
+val projectVersion = "0.2"
 
 lazy val root = (project in file("."))
   .settings(antlr4Settings : _*)
@@ -34,6 +34,7 @@ lazy val root = (project in file("."))
     name := "bolt",
     organization := "com.sopranoworks",
     version := projectVersion,
+    publishTo := Some(Resolver.file("codebook",file("../RustyRaven.github.io"))(Patterns(true, Resolver.mavenStyleBasePattern))),
     antlr4PackageName in Antlr4 := Some("com.sopranoworks.bolt"),
     libraryDependencies ++=
       spannerClientLibraries ++

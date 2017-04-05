@@ -18,11 +18,15 @@ object Bolt {
     * @param dbClient A database clinet
     */
   implicit class Nat(dbClient: DatabaseClient) {
+    private implicit def _dbClient = dbClient
+    private var _transactionContext: Option[TransactionContext] = None
+    private var _mutations = List.empty[Mutation]
+
     /**
       * Executing INSERT/UPDATE/DELETE query on Google Cloud Spanner
       * @param sql a INSERT/UPDATE/DELETE sql statement
       */
-    def executeQuery(sql:String): Unit = {
+    def executeQuery(sql:String): ResultSet = {
       val source = new ByteArrayInputStream( sql.getBytes("UTF8"))
       val input = new ANTLRInputStream(source)
       val lexer = new MiniSqlLexer(input)
@@ -33,7 +37,17 @@ object Bolt {
       parser.nat = this
       parser.removeErrorListeners()
 
-      parser.minisql()
+      try {
+        parser.minisql().resultSet
+      } catch {
+        case _ : NativeSqlException =>
+          _transactionContext match {
+            case Some(tr) =>
+              tr.executeQuery(Statement.of(sql))
+            case _ =>
+              dbClient.singleUse ().executeQuery (Statement.of (sql) )
+          }
+      }
     }
 
     /**
@@ -48,7 +62,23 @@ object Bolt {
     def insert(tableName:String,values:java.util.List[String]):Unit = {
       val m = Mutation.newInsertBuilder(tableName)
       Database(dbClient).table(tableName).columns.zip(values).foreach(kv=>m.set(kv._1).to(kv._2))
-      dbClient.write(List(m.build()))
+      _transactionContext match {
+        case Some(_) =>
+          _mutations ++= List(m.build())
+        case _ =>
+          dbClient.write(List(m.build()))
+      }
+    }
+
+    def insert(tableName:String,columns:java.util.List[String],values:java.util.List[String]):Unit = {
+      val m = Mutation.newInsertBuilder(tableName)
+      columns.zip(values).foreach(kv=>m.set(kv._1).to(kv._2))
+      _transactionContext match {
+        case Some(_) =>
+          _mutations ++= List(m.build())
+        case _ =>
+          dbClient.write(List(m.build()))
+      }
     }
 
     private def _getTargetKeys(transaction: TransactionContext,tableName:String,where:String):List[String] = {
@@ -85,27 +115,50 @@ object Bolt {
           m.set(k).to(v)
           keysAndValues.foreach(kv=>m.set(kv.key).to(kv.value))
 
-          dbClient.write(List(m.build()))
+          _transactionContext match {
+            case Some(_) =>
+              _mutations ++= List(m.build())
+            case _ =>
+              dbClient.write(List(m.build()))
+          }
 
         case NormalWhere(w) =>
-          dbClient.readWriteTransaction()
-            .run(new TransactionCallable[Unit] {
-              override def run(transaction: TransactionContext):Unit = {
-                val keys = _getTargetKeys(transaction,tableName,w)
-                if (keys.nonEmpty) {
-                  val key = Database(dbClient).table(tableName).key
-                  val ml = keys.map {
-                    k =>
-                      val m = Mutation.newUpdateBuilder(tableName)
-                      m.set(key).to(k)
-                      keysAndValues.foreach(kv=>m.set(kv.key).to(kv.value))
+          _transactionContext match {
+            case Some(tr) =>
+              val keys = _getTargetKeys(tr,tableName,w)
+              if (keys.nonEmpty) {
+                val key = Database(dbClient).table(tableName).key
+                val ml = keys.map {
+                  k =>
+                    val m = Mutation.newUpdateBuilder(tableName)
+                    m.set(key).to(k)
+                    keysAndValues.foreach(kv=>m.set(kv.key).to(kv.value))
 
-                      m.build()
-                  }
-                  transaction.buffer(ml)
+                    m.build()
                 }
-              }               
-            })
+                _mutations ++= ml
+              }
+
+            case _ =>
+              dbClient.readWriteTransaction()
+                .run(new TransactionCallable[Unit] {
+                  override def run(transaction: TransactionContext):Unit = {
+                    val keys = _getTargetKeys(transaction,tableName,w)
+                    if (keys.nonEmpty) {
+                      val key = Database(dbClient).table(tableName).key
+                      val ml = keys.map {
+                        k =>
+                          val m = Mutation.newUpdateBuilder(tableName)
+                          m.set(key).to(k)
+                          keysAndValues.foreach(kv=>m.set(kv.key).to(kv.value))
+
+                          m.build()
+                      }
+                      transaction.buffer(ml)
+                    }
+                  }
+                })
+          }
       }
     }
 
@@ -116,22 +169,40 @@ object Bolt {
       Option(where) match {
         case Some(PrimaryKeyWhere(k,v)) =>
           val m = Mutation.delete(tableName,Key.of(v))
-          dbClient.write(List(m))
+          _transactionContext match {
+            case Some(_) =>
+              _mutations ++= List(m)
+            case _ =>
+              dbClient.write(List(m))
+          }
 
         case Some(NormalWhere(w)) =>
-          dbClient.readWriteTransaction()
-            .run(new TransactionCallable[Unit] {
-              override def run(transaction: TransactionContext):Unit = {
-                val keys = _getTargetKeys(transaction,tableName,w)
-                if (keys.nonEmpty) {
-                  val ml = keys.map {
-                    k =>
-                      Mutation.delete(tableName,Key.of(k))
-                  }
-                  transaction.buffer(ml)
+          _transactionContext match {
+            case Some(tr) =>
+              val keys = _getTargetKeys(tr,tableName,w)
+              if (keys.nonEmpty) {
+                val ml = keys.map {
+                  k =>
+                    Mutation.delete(tableName,Key.of(k))
                 }
+                _mutations ++= ml
               }
-            })
+
+            case _ =>
+              dbClient.readWriteTransaction()
+                .run(new TransactionCallable[Unit] {
+                  override def run(transaction: TransactionContext):Unit = {
+                    val keys = _getTargetKeys(transaction,tableName,w)
+                    if (keys.nonEmpty) {
+                      val ml = keys.map {
+                        k =>
+                          Mutation.delete(tableName,Key.of(k))
+                      }
+                      transaction.buffer(ml)
+                    }
+                  }
+                })
+          }
 
         case None =>
           val m = Mutation.delete(tableName,KeySet.all())
@@ -139,5 +210,39 @@ object Bolt {
         case _ =>
       }
     }
+
+    /**
+      * Internal use
+      * To resolve Antlr4's 'throws' keyword issue
+      * Currently, when 'throws' is used in the grammar, it will cause strange result on compile time.
+      * TODO: Modify to use 'throws' when it is resolved.
+      */
+    def useNative():Unit =
+      throw new NativeSqlException
+
+
+    def beginTransaction(f:Nat => Unit):Unit = {
+      val self = this
+      dbClient.readWriteTransaction()
+        .run(new TransactionCallable[Unit] {
+          override def run(transaction: TransactionContext): Unit = {
+            _transactionContext = Some(transaction)
+            f(self)
+            if (_mutations.nonEmpty) {
+              transaction.buffer(_mutations)
+            }
+            _transactionContext = None
+          }
+        })
+    }
+
+    def sql(q:String) = executeQuery(q)
+
+    def rollback:Unit = _transactionContext.foreach(_ => _mutations = List.empty[Mutation])
   }
+
+  implicit def resultSetToIterator(resultSet: ResultSet):Iterator[ResultSet] = Iterator.continually(resultSet).takeWhile(_.next())
+
+  def executeQuery(sql:String)(implicit dbClient:Nat):ResultSet =
+    dbClient.executeQuery(sql)
 }
