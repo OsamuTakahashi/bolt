@@ -36,17 +36,18 @@ class Table(dbClient:DatabaseClient,name:String) {
   def columns:List[String] = synchronized {
     _columns.getOrElse {
       val resultSet = dbClient.singleUse().executeQuery(Statement.of(s"SELECT * FROM INFORMATION_SCHEMA.COLUMNS AS t WHERE t.TABLE_NAME='$name'"))
-      var columns = List.empty[String]
+      var columns = List.empty[(String,Int)]
 
       while(resultSet.next()) {
         val nm = resultSet.getString("COLUMN_NAME")
         val tp = resultSet.getString("SPANNER_TYPE")
-        columns ::= nm
+        val p = resultSet.getLong("ORDINAL_POSITION").toInt
+        columns ::= (nm,p)
         _columnTypes += (nm->tp)
       }
-      columns = columns.reverse
-      _columns = Some(columns)
-      columns
+      val col = columns.sortWith(_._2 < _._2).map(_._1)
+      _columns = Some(col)
+      col
     }
   }
 

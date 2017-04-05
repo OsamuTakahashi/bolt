@@ -61,7 +61,9 @@ object Bolt {
       */
     def insert(tableName:String,values:java.util.List[String]):Unit = {
       val m = Mutation.newInsertBuilder(tableName)
-      Database(dbClient).table(tableName).columns.zip(values).foreach(kv=>m.set(kv._1).to(kv._2))
+      val columns = Database(dbClient).table(tableName).columns
+      columns.zip(values).foreach(kv=>m.set(kv._1).to(kv._2))
+
       _transactionContext match {
         case Some(_) =>
           _mutations ++= List(m.build())

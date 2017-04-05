@@ -28,12 +28,12 @@ insert_stmt returns [ ResultSet resultSet = null ]
               List<String> columns = new ArrayList<String>(),
               List<String> values = new ArrayList<String>()
             ]
-        : INSERT INTO? ID ( '(' ID { $columns.add($ID.text); } (',' ID { $columns.add($ID.text); } )*  ')' )?
+        : INSERT INTO? tbl=ID ( '(' ID { $columns.add($ID.text); } (',' ID { $columns.add($ID.text); } )*  ')' )?
             VALUES '(' value { $values.add($value.v.text()); } (',' value { $values.add($value.v.text()); } )* ')' ';'? {
               if ($columns.size() == 0)
-                nat.insert($ID.text,$values);
+                nat.insert($tbl.text,$values);
               else
-                nat.insert($ID.text,$columns,$values);
+                nat.insert($tbl.text,$columns,$values);
             }
         ;
 
