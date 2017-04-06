@@ -234,6 +234,7 @@ object Bolt {
               transaction.buffer(_mutations)
             }
             _transactionContext = None
+            _mutations = List.empty[Mutation]
           }
         })
     }
