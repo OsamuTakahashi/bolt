@@ -1,6 +1,6 @@
 package com.sopranoworks.bolt
 
-import com.google.cloud.spanner.{DatabaseClient, DatabaseId, SpannerOptions, Statement}
+import com.google.cloud.spanner._
 import com.typesafe.config.ConfigFactory
 import org.specs2.mutable.Specification
 import org.specs2.specification.BeforeAfterEach
@@ -22,9 +22,10 @@ class NatTest extends Specification with BeforeAfterEach {
     _options = Some(options)
     val spanner = options.getService
     val dbClient = spanner.getDatabaseClient(DatabaseId.of(options.getProjectId, config.getString("spanner.instance"), config.getString("spanner.database")))
+    Database.begin(dbClient)
     _dbClient = Some(dbClient)
     _dbClient.foreach(_.executeQuery("DELETE test_tbl01"))
-    _dbClient.foreach(_.executeQuery("DELETE items"))
+    _dbClient.foreach(_.executeQuery("DELETE test_items"))
   }
 
   override protected def after: Any = {
@@ -49,12 +50,12 @@ class NatTest extends Specification with BeforeAfterEach {
       res must_== true
     }
     "multiple insert" in {
-      _dbClient.get.sql("INSERT INTO items VALUES(0,0,0,100);")
-      _dbClient.get.sql("INSERT INTO items VALUES(1,0,1,100);")
-      _dbClient.get.sql("INSERT INTO items VALUES(2,0,2,100);")
-      _dbClient.get.sql("INSERT INTO items VALUES(3,0,3,100);")
+      _dbClient.get.sql("INSERT INTO test_items VALUES(0,0,0,100);")
+      _dbClient.get.sql("INSERT INTO test_items VALUES(1,0,1,100);")
+      _dbClient.get.sql("INSERT INTO test_items VALUES(2,0,2,100);")
+      _dbClient.get.sql("INSERT INTO test_items VALUES(3,0,3,100);")
 
-      val resSet2 = _dbClient.get.singleUse().executeQuery(Statement.of("SELECT * FROM items"))
+      val resSet2 = _dbClient.get.singleUse().executeQuery(Statement.of("SELECT * FROM test_items"))
 
       var count = 0
       while(resSet2.next()) {
@@ -63,17 +64,17 @@ class NatTest extends Specification with BeforeAfterEach {
       count must_== 4
     }
     "multiple insert 2" in {
-      _dbClient.get.sql("INSERT INTO items (id,uid,iid,count) VALUES(0,0,0,100);")
-      _dbClient.get.sql("INSERT INTO items (id,uid,iid,count) VALUES(1,0,1,100);")
-      _dbClient.get.sql("INSERT INTO items (id,uid,iid,count) VALUES(2,0,2,100);")
-      _dbClient.get.sql("INSERT INTO items (id,uid,iid,count) VALUES(3,0,3,100);")
+      _dbClient.get.sql("INSERT INTO test_items (id,uid,iid,count) VALUES(0,0,0,100);")
+      _dbClient.get.sql("INSERT INTO test_items (id,uid,iid,count) VALUES(1,0,1,100);")
+      _dbClient.get.sql("INSERT INTO test_items (id,uid,iid,count) VALUES(2,0,2,100);")
+      _dbClient.get.sql("INSERT INTO test_items (id,uid,iid,count) VALUES(3,0,3,100);")
 
-      _dbClient.get.sql("INSERT INTO items (id,uid,iid,count) VALUES(4,0,4,100)")
-      _dbClient.get.sql("INSERT INTO items (id,uid,iid,count) VALUES(5,0,5,100)")
-      _dbClient.get.sql("INSERT INTO items (id,uid,iid,count) VALUES(6,0,6,100)")
-      _dbClient.get.sql("INSERT INTO items (id,uid,iid,count) VALUES(7,0,7,100)")
+      _dbClient.get.sql("INSERT INTO test_items (id,uid,iid,count) VALUES(4,0,4,100)")
+      _dbClient.get.sql("INSERT INTO test_items (id,uid,iid,count) VALUES(5,0,5,100)")
+      _dbClient.get.sql("INSERT INTO test_items (id,uid,iid,count) VALUES(6,0,6,100)")
+      _dbClient.get.sql("INSERT INTO test_items (id,uid,iid,count) VALUES(7,0,7,100)")
 
-      val resSet2 = _dbClient.get.singleUse().executeQuery(Statement.of("SELECT * FROM items"))
+      val resSet2 = _dbClient.get.singleUse().executeQuery(Statement.of("SELECT * FROM test_items"))
 
       var count = 0
       while(resSet2.next()) {
@@ -215,24 +216,32 @@ class NatTest extends Specification with BeforeAfterEach {
 
       val resSet2 = _dbClient.get.executeQuery("SELECT * FROM test_tbl01 WHERE name='new name';")
 
+      println("done")
       var count = 0
-//      for {
-//        r<-resSet2
-//      } yield {
-//        count += 1
+//      try {
+//        resSet2.map(_ => count += 1)
+////        for {
+////          r <- resSet2.iterator
+////        } yield {
+////          println("*")
+////          count += 1
+////        }
+//      } catch {
+//        case e:SpannerException =>
+//          println(e.getMessage)
 //      }
       while(resSet2.next()) {
         count += 1
       }
       count must_== 3
     }
-    "multiple commit" in {
+     "multiple commit" in {
       _dbClient.get.beginTransaction {
         db =>
-          db.sql("INSERT INTO items (id,uid,iid,count) VALUES(0,0,0,100);")
-          db.sql("INSERT INTO items (id,uid,iid,count) VALUES(1,0,1,100);")
-          db.sql("INSERT INTO items (id,uid,iid,count) VALUES(2,0,2,100);")
-          db.sql("INSERT INTO items (id,uid,iid,count) VALUES(3,0,3,100);")
+          db.sql("INSERT INTO test_items (id,uid,iid,count) VALUES(0,0,0,100);")
+          db.sql("INSERT INTO test_items (id,uid,iid,count) VALUES(1,0,1,100);")
+          db.sql("INSERT INTO test_items (id,uid,iid,count) VALUES(2,0,2,100);")
+          db.sql("INSERT INTO test_items (id,uid,iid,count) VALUES(3,0,3,100);")
       }
 
       _dbClient.get.beginTransaction {
@@ -240,12 +249,12 @@ class NatTest extends Specification with BeforeAfterEach {
           val resSet = db.sql(s"SELECT * FROM items WHERE uid=0")
           while(resSet.next()) {}
 
-          db.sql("INSERT INTO items (id,uid,iid,count) VALUES(4,0,4,100)")
-          db.sql("INSERT INTO items (id,uid,iid,count) VALUES(5,0,5,100)")
-          db.sql("INSERT INTO items (id,uid,iid,count) VALUES(6,0,6,100)")
-          db.sql("INSERT INTO items (id,uid,iid,count) VALUES(7,0,7,100)")
+          db.sql("INSERT INTO test_items (id,uid,iid,count) VALUES(4,0,4,100)")
+          db.sql("INSERT INTO test_items (id,uid,iid,count) VALUES(5,0,5,100)")
+          db.sql("INSERT INTO test_items (id,uid,iid,count) VALUES(6,0,6,100)")
+          db.sql("INSERT INTO test_items (id,uid,iid,count) VALUES(7,0,7,100)")
       }
-      val resSet2 = _dbClient.get.executeQuery("SELECT * FROM items;")
+      val resSet2 = _dbClient.get.executeQuery("SELECT * FROM test_items;")
       var count = 0
       while(resSet2.next()) {
         count += 1
@@ -253,7 +262,7 @@ class NatTest extends Specification with BeforeAfterEach {
       count must_== 8
     }
     "multiple commit 2" in {
-      val table = "items"
+      val table = "test_items"
       val uid = 0L
       var n = 0
       while(n < 12) {
@@ -277,7 +286,7 @@ class NatTest extends Specification with BeforeAfterEach {
             }
         }
       }
-      val resSet2 = _dbClient.get.executeQuery("SELECT * FROM items;")
+      val resSet2 = _dbClient.get.executeQuery(s"SELECT * FROM $table;")
       var count = 0
       while(resSet2.next()) {
         count += 1

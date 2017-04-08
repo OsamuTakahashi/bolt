@@ -6,6 +6,7 @@ import com.google.cloud.spanner.TransactionRunner.TransactionCallable
 import com.google.cloud.spanner._
 import org.antlr.v4.runtime._
 
+import scala.collection.AbstractIterator
 import scala.collection.JavaConversions._
 
 /**
@@ -18,7 +19,7 @@ object Bolt {
     * @param dbClient A database clinet
     */
   implicit class Nat(dbClient: DatabaseClient) {
-    private implicit def _dbClient = dbClient
+//    private implicit def _dbClient = dbClient
     private var _transactionContext: Option[TransactionContext] = None
     private var _mutations = List.empty[Mutation]
 
@@ -54,15 +55,15 @@ object Bolt {
       * Internal use
       */
     def isKey(tableName:String,columnName:String):Boolean =
-      Database(dbClient).table(tableName).isKey(columnName)
+      Database(dbClient).table(tableName).get.isKey(columnName)
 
     /**
       * Internal use
       */
     def insert(tableName:String,values:java.util.List[String]):Unit = {
       val m = Mutation.newInsertBuilder(tableName)
-      val columns = Database(dbClient).table(tableName).columns
-      columns.zip(values).foreach(kv=>m.set(kv._1).to(kv._2))
+      val columns = Database(dbClient).table(tableName).get.columns
+      columns.zip(values).foreach(kv=>m.set(kv._1.name).to(kv._2))
 
       _transactionContext match {
         case Some(_) =>
@@ -84,7 +85,7 @@ object Bolt {
     }
 
     private def _getTargetKeys(transaction: TransactionContext,tableName:String,where:String):List[String] = {
-      val tbl = Database(dbClient).table(tableName)
+      val tbl = Database(dbClient).table(tableName).get
       val key = tbl.key
       val resSet = transaction.executeQuery(Statement.of(s"SELECT $key FROM $tableName $where"))
       var keys = List.empty[String]
@@ -129,7 +130,7 @@ object Bolt {
             case Some(tr) =>
               val keys = _getTargetKeys(tr,tableName,w)
               if (keys.nonEmpty) {
-                val key = Database(dbClient).table(tableName).key
+                val key = Database(dbClient).table(tableName).get.key
                 val ml = keys.map {
                   k =>
                     val m = Mutation.newUpdateBuilder(tableName)
@@ -147,7 +148,7 @@ object Bolt {
                   override def run(transaction: TransactionContext):Unit = {
                     val keys = _getTargetKeys(transaction,tableName,w)
                     if (keys.nonEmpty) {
-                      val key = Database(dbClient).table(tableName).key
+                      val key = Database(dbClient).table(tableName).get.key
                       val ml = keys.map {
                         k =>
                           val m = Mutation.newUpdateBuilder(tableName)
@@ -244,7 +245,24 @@ object Bolt {
     def rollback:Unit = _transactionContext.foreach(_ => _mutations = List.empty[Mutation])
   }
 
-  implicit def resultSetToIterator(resultSet: ResultSet):Iterator[ResultSet] = Iterator.continually(resultSet).takeWhile(_.next())
+  implicit def resultSetToIterator(resultSet: ResultSet):Iterator[ResultSet] = new AbstractIterator[ResultSet] {
+    override def hasNext: Boolean =
+      resultSet.next()
+    override def next(): ResultSet =
+        resultSet
+  }
+
+  implicit class Washer(resultSet: ResultSet) {
+    def iterator = resultSetToIterator(resultSet)
+  }
+
+
+  def tryq(q: => ResultSet):Either[SpannerException,ResultSet] = try {
+    Right(q)
+  } catch {
+    case e : SpannerException =>
+      Left(e)
+  }
 
   def executeQuery(sql:String)(implicit dbClient:Nat):ResultSet =
     dbClient.executeQuery(sql)

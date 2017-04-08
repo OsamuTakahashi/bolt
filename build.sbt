@@ -25,7 +25,7 @@ val commonLibraries = Seq(
 
 parallelExecution in ThisBuild := false
 
-val projectVersion = "0.2.3"
+val projectVersion = "0.3"
 
 lazy val root = (project in file("."))
   .settings(antlr4Settings : _*)
