@@ -3,7 +3,7 @@ import sbt.Keys._
 val projectScalaVersion = "2.11.8"
 
 val spannerClientLibraries = Seq(
-  "com.google.cloud" % "google-cloud-spanner" % "0.10.0-beta",
+  "com.google.cloud" % "google-cloud-spanner" % "0.12.0-beta",
   "com.google.auth" % "google-auth-library-oauth2-http" % "0.6.0",
   "com.google.guava" % "guava" % "21.0"
 ) 
