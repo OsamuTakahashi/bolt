@@ -22,7 +22,7 @@ class NatTest extends Specification with BeforeAfterEach {
     _options = Some(options)
     val spanner = options.getService
     val dbClient = spanner.getDatabaseClient(DatabaseId.of(options.getProjectId, config.getString("spanner.instance"), config.getString("spanner.database")))
-    Database.begin(dbClient)
+    Database.beginWith(dbClient)
     _dbClient = Some(dbClient)
     _dbClient.foreach(_.executeQuery("DELETE test_tbl01"))
     _dbClient.foreach(_.executeQuery("DELETE test_items"))

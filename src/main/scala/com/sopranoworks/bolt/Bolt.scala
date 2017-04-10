@@ -5,6 +5,7 @@ import java.io.ByteArrayInputStream
 import com.google.cloud.spanner.TransactionRunner.TransactionCallable
 import com.google.cloud.spanner._
 import org.antlr.v4.runtime._
+import org.slf4j.LoggerFactory
 
 import scala.collection.AbstractIterator
 import scala.collection.JavaConversions._
@@ -13,6 +14,7 @@ import scala.collection.JavaConversions._
   * Created by takahashi on 2017/03/28.
   */
 object Bolt {
+  private val _logger = LoggerFactory.getLogger(this.getClass)
 
   /**
     * A Google Cloud Spanner java client library wrapper class
@@ -126,6 +128,7 @@ object Bolt {
           }
 
         case NormalWhere(w) =>
+          _logger.info(s"Slow update query on $tableName. Reason => $w")
           _transactionContext match {
             case Some(tr) =>
               val keys = _getTargetKeys(tr,tableName,w)
@@ -180,6 +183,7 @@ object Bolt {
           }
 
         case Some(NormalWhere(w)) =>
+          _logger.info(s"Slow delete query on $tableName. Reason => $w")
           _transactionContext match {
             case Some(tr) =>
               val keys = _getTargetKeys(tr,tableName,w)

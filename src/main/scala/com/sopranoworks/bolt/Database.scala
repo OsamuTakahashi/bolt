@@ -55,5 +55,5 @@ object Database {
     db
   })
 
-  def begin(dbClient:DatabaseClient) = apply(dbClient)
+  def beginWith(dbClient:DatabaseClient) = apply(dbClient)
 }

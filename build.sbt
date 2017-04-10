@@ -38,6 +38,7 @@ lazy val root = (project in file("."))
     antlr4PackageName in Antlr4 := Some("com.sopranoworks.bolt"),
     libraryDependencies ++=
       spannerClientLibraries ++
+      loggingLibraries ++
       testLibraries ++
       commonLibraries
   )
