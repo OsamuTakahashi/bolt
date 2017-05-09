@@ -85,6 +85,8 @@ where_stmt returns [ Where where = null ] locals [ List<WhereCondition> conds = 
               $where = new NormalWhere(new String(stmt));
             }
           }
+        | WHERE ID IN '(' value ( ',' value )* ')' {
+          }
         | WHERE ID cond value { $conds.add(new WhereCondition(null,$ID.text,$cond.text,$value.v.qtext())); } ( rel ID cond value { $conds.add(new WhereCondition($rel.text,$ID.text,$cond.text,$value.v.qtext())); } )* {
             StringBuilder stmt = new StringBuilder();
             stmt.append("WHERE ");

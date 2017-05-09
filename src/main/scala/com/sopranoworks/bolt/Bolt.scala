@@ -2,6 +2,7 @@ package com.sopranoworks.bolt
 
 import java.io.ByteArrayInputStream
 
+import com.google.cloud.Date
 import com.google.cloud.spanner.TransactionRunner.TransactionCallable
 import com.google.cloud.spanner._
 import org.antlr.v4.runtime._
@@ -29,29 +30,30 @@ object Bolt {
       * Executing INSERT/UPDATE/DELETE query on Google Cloud Spanner
       * @param sql a INSERT/UPDATE/DELETE sql statement
       */
-    def executeQuery(sql:String): ResultSet = {
-      val source = new ByteArrayInputStream( sql.getBytes("UTF8"))
-      val input = new ANTLRInputStream(source)
-      val lexer = new MiniSqlLexer(input)
-      lexer.removeErrorListeners()
+    def executeQuery(sql:String): ResultSet = sql.split(";").map(_.trim).filter(!_.isEmpty).map {
+      s =>
+        val source = new ByteArrayInputStream(s.getBytes("UTF8"))
+        val input = new ANTLRInputStream(source)
+        val lexer = new MiniSqlLexer(input)
+        lexer.removeErrorListeners()
 
-      val tokenStream = new CommonTokenStream(lexer)
-      val parser = new MiniSqlParser(tokenStream)
-      parser.nat = this
-      parser.removeErrorListeners()
+        val tokenStream = new CommonTokenStream(lexer)
+        val parser = new MiniSqlParser(tokenStream)
+        parser.nat = this
+        parser.removeErrorListeners()
 
-      try {
-        parser.minisql().resultSet
-      } catch {
-        case _ : NativeSqlException =>
-          _transactionContext match {
-            case Some(tr) =>
-              tr.executeQuery(Statement.of(sql))
-            case _ =>
-              dbClient.singleUse ().executeQuery (Statement.of (sql) )
-          }
-      }
-    }
+        try {
+          parser.minisql().resultSet
+        } catch {
+          case _: NativeSqlException =>
+            _transactionContext match {
+              case Some(tr) =>
+                tr.executeQuery(Statement.of(sql))
+              case _ =>
+                dbClient.singleUse().executeQuery(Statement.of(sql))
+            }
+        }
+    }.headOption.orNull
 
     /**
       * Internal use
@@ -259,6 +261,45 @@ object Bolt {
   implicit class Washer(resultSet: ResultSet) {
     def iterator = resultSetToIterator(resultSet)
   }
+
+  implicit class SafeResultSet(resultSet: ResultSet) {
+    def getBooleanOpt(name:String):Option[Boolean] =
+      try {
+        Some(resultSet.getBoolean(name))
+      } catch {
+        case _ : Exception =>
+          None
+      }
+    def getLongOpt(name:String):Option[Long] =
+      try {
+        Some(resultSet.getLong(name))
+      } catch {
+        case _ : Exception =>
+          None
+      }
+    def getDoubleOpt(name:String):Option[Double] =
+      try {
+        Some(resultSet.getDouble(name))
+      } catch {
+        case _ : Exception =>
+          None
+      }
+    def getStringOpt(name:String):Option[String] =
+      try {
+        Some(resultSet.getString(name))
+      } catch {
+        case _ : Exception =>
+          None
+      }
+    def getDateOpt(name:String):Option[Date] =
+      try {
+        Some(resultSet.getDate(name))
+      } catch {
+        case _ : Exception =>
+          None
+      }
+  }
+
 
 
   def tryq(q: => ResultSet):Either[SpannerException,ResultSet] = try {

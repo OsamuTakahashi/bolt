@@ -2,8 +2,14 @@ import sbt.Keys._
 
 val projectScalaVersion = "2.11.8"
 
+resolvers in Global += "RustyRaven" at "http://rustyraven.github.io"
+
+resolvers in Global += "scalaz-bintray" at "http://dl.bintray.com/scalaz/releases"
+
+val codebookLibrary = Seq("com.rustyraven" %% "codebook-runtime" % "1.2-SNAPSHOT")
+
 val spannerClientLibraries = Seq(
-  "com.google.cloud" % "google-cloud-spanner" % "0.12.0-beta",
+  "com.google.cloud" % "google-cloud-spanner" % "0.17.2-beta",
   "com.google.auth" % "google-auth-library-oauth2-http" % "0.6.0",
   "com.google.guava" % "guava" % "21.0"
 ) 
@@ -25,7 +31,7 @@ val commonLibraries = Seq(
 
 parallelExecution in ThisBuild := false
 
-val projectVersion = "0.3"
+val projectVersion = "0.4-SNAPSHOT"
 
 lazy val root = (project in file("."))
   .settings(antlr4Settings : _*)
@@ -34,12 +40,14 @@ lazy val root = (project in file("."))
     name := "bolt",
     organization := "com.sopranoworks",
     version := projectVersion,
-    publishTo := Some(Resolver.file("codebook",file("../RustyRaven.github.io"))(Patterns(true, Resolver.mavenStyleBasePattern))),
+    publishTo := Some(Resolver.file("bolt",file("../RustyRaven.github.io"))(Patterns(true, Resolver.mavenStyleBasePattern))),
     antlr4PackageName in Antlr4 := Some("com.sopranoworks.bolt"),
     libraryDependencies ++=
       spannerClientLibraries ++
+      codebookLibrary ++
       loggingLibraries ++
       testLibraries ++
-      commonLibraries
+      commonLibraries,
+    dependencyOverrides += "io.netty" % "netty-tcnative-boringssl-static" % "1.1.33.Fork22"
   )
   .enablePlugins(JavaAppPackaging)

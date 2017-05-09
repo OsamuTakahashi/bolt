@@ -78,6 +78,9 @@ XOR     : X O R
 LIKE    : L I K E
         ;
 
+IN      : I N
+        ;
+
 EQ      : '='
         ;
 
