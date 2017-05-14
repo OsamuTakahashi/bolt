@@ -22,7 +22,7 @@ class NatTest extends Specification with BeforeAfterEach {
     _options = Some(options)
     val spanner = options.getService
     val dbClient = spanner.getDatabaseClient(DatabaseId.of(options.getProjectId, config.getString("spanner.instance"), config.getString("spanner.database")))
-    Database.beginWith(dbClient)
+    Database.startWith(dbClient)
     _dbClient = Some(dbClient)
     _dbClient.foreach(_.executeQuery("DELETE test_tbl01"))
     _dbClient.foreach(_.executeQuery("DELETE test_items"))
@@ -206,13 +206,16 @@ class NatTest extends Specification with BeforeAfterEach {
       _dbClient.get.executeQuery("INSERT INTO test_tbl01 VALUES(102,'user2');")
       _dbClient.get.executeQuery("INSERT INTO test_tbl01 VALUES(103,'user3');")
 
+      var count0 = 0
       _dbClient.get.beginTransaction {
         db =>
           val resSet = db.sql("SELECT * FROM test_tbl01;")
           while(resSet.next()) {
             db.sql(s"UPDATE test_tbl01 set name='new name' WHERE id=${resSet.getLong(0)};")
-        }
+            count0 += 1
+          }
       }
+      count0 must_== 3
 
       val resSet2 = _dbClient.get.executeQuery("SELECT * FROM test_tbl01 WHERE name='new name';")
 
@@ -246,7 +249,7 @@ class NatTest extends Specification with BeforeAfterEach {
 
       _dbClient.get.beginTransaction {
         db =>
-          val resSet = db.sql(s"SELECT * FROM items WHERE uid=0")
+          val resSet = db.sql(s"SELECT * FROM test_items WHERE uid=0")
           while(resSet.next()) {}
 
           db.sql("INSERT INTO test_items (id,uid,iid,count) VALUES(4,0,4,100)")

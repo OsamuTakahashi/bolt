@@ -28,6 +28,7 @@ object Bolt {
 
     /**
       * Executing INSERT/UPDATE/DELETE query on Google Cloud Spanner
+      * @note This class is NOT THREAD SAFE!
       * @param sql a INSERT/UPDATE/DELETE sql statement
       */
     def executeQuery(sql:String): ResultSet = sql.split(";").map(_.trim).filter(!_.isEmpty).map {
@@ -64,10 +65,10 @@ object Bolt {
     /**
       * Internal use
       */
-    def insert(tableName:String,values:java.util.List[String]):Unit = {
+    def insert(tableName:String,values:java.util.List[Value]):Unit = {
       val m = Mutation.newInsertBuilder(tableName)
       val columns = Database(dbClient).table(tableName).get.columns
-      columns.zip(values).foreach(kv=>m.set(kv._1.name).to(kv._2))
+      columns.zip(values).foreach(kv=>m.set(kv._1.name).to(kv._2.text))
 
       _transactionContext match {
         case Some(_) =>
@@ -77,9 +78,9 @@ object Bolt {
       }
     }
 
-    def insert(tableName:String,columns:java.util.List[String],values:java.util.List[String]):Unit = {
+    def insert(tableName:String,columns:java.util.List[String],values:java.util.List[Value]):Unit = {
       val m = Mutation.newInsertBuilder(tableName)
-      columns.zip(values).foreach(kv=>m.set(kv._1).to(kv._2))
+      columns.zip(values).foreach(kv=>m.set(kv._1).to(kv._2.text))
       _transactionContext match {
         case Some(_) =>
           _mutations ++= List(m.build())
@@ -127,6 +128,21 @@ object Bolt {
               _mutations ++= List(m.build())
             case _ =>
               dbClient.write(List(m.build()))
+          }
+
+        case PrimaryKeyListWhere(k,v) =>
+          val mm = v.map {
+            vv=>
+              val m = Mutation.newUpdateBuilder(tableName)
+              m.set(k).to(vv.text)
+              keysAndValues.foreach(kv=>m.set(kv.key).to(kv.value))
+              m.build()
+          }
+          _transactionContext match {
+            case Some(_) =>
+              _mutations ++= mm
+            case _ =>
+              dbClient.write(mm)
           }
 
         case NormalWhere(w) =>

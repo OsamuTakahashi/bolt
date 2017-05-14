@@ -25,15 +25,14 @@ select_stmt /* throws NativeSqlException */
 
 insert_stmt returns [ ResultSet resultSet = null ]
             locals [
-              List<String> columns = new ArrayList<String>(),
-              List<String> values = new ArrayList<String>()
+              List<String> columns = new ArrayList<String>()
             ]
         : INSERT INTO? tbl=ID ( '(' ID { $columns.add($ID.text); } (',' ID { $columns.add($ID.text); } )*  ')' )?
-            VALUES '(' value { $values.add($value.v.text()); } (',' value { $values.add($value.v.text()); } )* ')' ';'? {
+            VALUES values ';'? {
               if ($columns.size() == 0)
-                nat.insert($tbl.text,$values);
+                nat.insert($tbl.text,$values.valueList);
               else
-                nat.insert($tbl.text,$columns,$values);
+                nat.insert($tbl.text,$columns,$values.valueList);
             }
         ;
 
@@ -42,7 +41,7 @@ update_stmt
             locals [
               List<KeyValue> kvs = new ArrayList<KeyValue>()
             ]
-        : UPDATE ID { currentTable = $ID.text; } SET ID EQ value { $kvs.add(new KeyValue($ID.text,$value.v.text())); } ( ',' ID EQ value { $kvs.add(new KeyValue($ID.text,$value.v.text())); } )* where_stmt ( LIMIT ln=INT )? ';'? {
+        : UPDATE ID { currentTable = $ID.text; } SET ID EQ value { $kvs.add(new KeyValue($ID.text,$value.v.text())); } ( ',' ID EQ value { $kvs.add(new KeyValue($ID.text,$value.v.text())); } )* where_stmt ( LIMIT ln=NUMBER )? ';'? {
             if ($where_stmt.where.onlyPrimaryKey()) {
               nat.update(currentTable,$kvs,$where_stmt.where);
             } else {
@@ -69,7 +68,9 @@ create_stmt /* throws NativeSqlException */
 
 value returns [ Value v = null ]
         : STRING { $v = new StringValue($STRING.text.substring(1,$STRING.text.length() - 1)); }
-        | INT { $v = new IntValue($INT.text); }
+        | NUMBER { $v = new IntValue($NUMBER.text); }
+        | TRUE { $v = new IntValue($TRUE.text); }
+        | FALSE { $v = new IntValue($FALSE.text); }
         ;
 
 where_stmt returns [ Where where = null ] locals [ List<WhereCondition> conds = new ArrayList<WhereCondition>() ]
@@ -85,7 +86,17 @@ where_stmt returns [ Where where = null ] locals [ List<WhereCondition> conds = 
               $where = new NormalWhere(new String(stmt));
             }
           }
-        | WHERE ID IN '(' value ( ',' value )* ')' {
+        | WHERE ID IN values {
+            if (nat.isKey(currentTable,$ID.text)) {
+              $where = new PrimaryKeyListWhere($ID.text,$values.valueList);
+            } else {
+              StringBuilder stmt = new StringBuilder();
+              stmt.append("WHERE ");
+              stmt.append($ID.text);
+              stmt.append(" IN ");
+              stmt.append($values.text);
+              $where = new NormalWhere(new String(stmt));
+            }
           }
         | WHERE ID cond value { $conds.add(new WhereCondition(null,$ID.text,$cond.text,$value.v.qtext())); } ( rel ID cond value { $conds.add(new WhereCondition($rel.text,$ID.text,$cond.text,$value.v.qtext())); } )* {
             StringBuilder stmt = new StringBuilder();
@@ -103,6 +114,10 @@ where_stmt returns [ Where where = null ] locals [ List<WhereCondition> conds = 
             }
             $where = new NormalWhere(new String(stmt));
           }
+        ;
+
+values returns [ List<Value> valueList = new ArrayList<Value>() ]
+        :  '(' value { $valueList.add($value.v); } ( ',' value { $valueList.add($value.v); } )* ')'
         ;
 
 rel returns [ String text = null ]

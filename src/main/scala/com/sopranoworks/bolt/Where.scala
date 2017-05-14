@@ -11,4 +11,8 @@ case class PrimaryKeyWhere(key:String,value:String) extends Where {
   override def onlyPrimaryKey: Boolean = true
 }
 
+case class PrimaryKeyListWhere(key:String,values:java.util.List[Value]) extends Where {
+  override def onlyPrimaryKey: Boolean = true
+}
+
 case class NormalWhere(whereStmt:String) extends Where
