@@ -19,16 +19,15 @@ object Bolt {
 
   /**
     * A Google Cloud Spanner java client library wrapper class
+    * @note This class is NOT THREAD SAFE!
     * @param dbClient A database clinet
     */
-  implicit class Nat(dbClient: DatabaseClient) {
-//    private implicit def _dbClient = dbClient
+  implicit class Nat(val dbClient: DatabaseClient) {
     private var _transactionContext: Option[TransactionContext] = None
     private var _mutations = List.empty[Mutation]
 
     /**
       * Executing INSERT/UPDATE/DELETE query on Google Cloud Spanner
-      * @note This class is NOT THREAD SAFE!
       * @param sql a INSERT/UPDATE/DELETE sql statement
       */
     def executeQuery(sql:String): ResultSet = sql.split(";").map(_.trim).filter(!_.isEmpty).map {
@@ -44,17 +43,25 @@ object Bolt {
         parser.removeErrorListeners()
 
         try {
-          parser.minisql().resultSet
+          try {
+            parser.minisql().resultSet
+          } catch {
+            case _: NativeSqlException =>
+              _logger.debug("native query")
+              _transactionContext match {
+                case Some(tr) =>
+                  tr.executeQuery(Statement.of(sql))
+                case _ =>
+                  dbClient.singleUse().executeQuery(Statement.of(sql))
+              }
+          }
         } catch {
-          case _: NativeSqlException =>
-            _transactionContext match {
-              case Some(tr) =>
-                tr.executeQuery(Statement.of(sql))
-              case _ =>
-                dbClient.singleUse().executeQuery(Statement.of(sql))
-            }
+          case e : Exception =>
+            if (parser.minisql().resultSet != null)
+              parser.minisql().resultSet.close()
+            throw e
         }
-    }.headOption.orNull
+    }.lastOption.orNull
 
     /**
       * Internal use
@@ -67,7 +74,12 @@ object Bolt {
       */
     def insert(tableName:String,values:java.util.List[Value]):Unit = {
       val m = Mutation.newInsertBuilder(tableName)
-      val columns = Database(dbClient).table(tableName).get.columns
+      val columns = Database(dbClient).table(tableName) match {
+        case Some(tbl) =>
+          tbl.columns
+        case None =>
+          throw new RuntimeException(s"Table not found $tableName")
+      }
       columns.zip(values).foreach(kv=>m.set(kv._1.name).to(kv._2.text))
 
       _transactionContext match {
@@ -245,6 +257,9 @@ object Bolt {
     def useNative():Unit =
       throw new NativeSqlException
 
+    def unknownFunction(name:String):Unit =
+      throw new RuntimeException(s"Unknown function $name")
+
 
     def beginTransaction(f:Nat => Unit):Unit = {
       val self = this
@@ -262,10 +277,35 @@ object Bolt {
         })
     }
 
+    /**
+      * For java
+      * @param t
+      */
+    def beginTransaction(t:Transaction):Unit = {
+      val self = this
+      dbClient.readWriteTransaction()
+        .run(new TransactionCallable[Unit] {
+          override def run(transaction: TransactionContext): Unit = {
+            _transactionContext = Some(transaction)
+            t.run(self)
+            if (_mutations.nonEmpty) {
+              transaction.buffer(_mutations)
+            }
+            _transactionContext = None
+            _mutations = List.empty[Mutation]
+          }
+        })
+    }
+
     def sql(q:String) = executeQuery(q)
 
     def rollback:Unit = _transactionContext.foreach(_ => _mutations = List.empty[Mutation])
   }
+
+  trait Transaction {
+    def run(nat:Nat):Unit
+  }
+
 
   implicit def resultSetToIterator(resultSet: ResultSet):Iterator[ResultSet] = new AbstractIterator[ResultSet] {
     override def hasNext: Boolean =

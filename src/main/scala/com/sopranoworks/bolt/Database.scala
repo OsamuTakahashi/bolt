@@ -1,16 +1,19 @@
 package com.sopranoworks.bolt
 
 import com.google.cloud.spanner.{DatabaseClient, Statement}
+import org.slf4j.LoggerFactory
 
 /**
   * Created by takahashi on 2017/03/28.
   */
 class Database(dbClient:DatabaseClient) {
+  private val _logger = LoggerFactory.getLogger(this.getClass)
   private var _tables = Map.empty[String,Table]
 
   def table(name:String):Option[Table] = _tables.get(name)
 
   def loadInformationSchema():Unit = {
+    _logger.info(s"Getting information schema ...")
     val resSet = dbClient.singleUse().executeQuery(Statement.of(s"SELECT * FROM INFORMATION_SCHEMA.COLUMNS"))
     var tables = Map.empty[String,List[Column]]
     while(resSet.next()) {
@@ -21,6 +24,7 @@ class Database(dbClient:DatabaseClient) {
         tables += t -> (col :: tables.getOrElse(t, Nil))
       }
     }
+    resSet.close()
     var indexes = Map.empty[(String,String),(String,List[IndexColumn])]
     val resSet2 = dbClient.singleUse().executeQuery(Statement.of(s"SELECT * FROM INFORMATION_SCHEMA.INDEX_COLUMNS"))
     while(resSet2.next()) {
@@ -33,6 +37,7 @@ class Database(dbClient:DatabaseClient) {
         indexes += (t, idx) -> (t, col :: indexes.get((t, idx)).map(_._2).getOrElse(Nil))
       }
     }
+    resSet2.close()
     var idxForTbl = Map.empty[String,List[Index]]
     indexes.foreach(kv=>idxForTbl += kv._2._1 -> (Index(kv._1._2, kv._2._2.sortWith(_.position < _.position)) :: idxForTbl.getOrElse(kv._2._1,Nil)))
 
@@ -42,6 +47,7 @@ class Database(dbClient:DatabaseClient) {
         val idx = idxForTbl.get(tbl)
         tbl->Table(dbClient,tbl,kv._2.sortWith(_.position < _.position),idx.flatMap(_.find(_.name == "PRIMARY_KEY")).get,idx.map(_.filter(_.name != "PRIMARY_KEY")).getOrElse(List()).map(i=>i.name->i).toMap)
     }
+    _logger.info(s"Getting information schema done")
   }
 }
 

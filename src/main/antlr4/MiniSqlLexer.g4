@@ -30,6 +30,9 @@ fragment Z:('z'|'Z');
 CREATE  : C R E A T E
         ;
 
+ALTER   : A L T E R
+        ;
+
 SELECT  : S E L E C T
         ;
 

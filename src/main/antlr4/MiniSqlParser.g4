@@ -3,6 +3,8 @@ options { tokenVocab=MiniSqlLexer; }
 
 @header {
 import com.google.cloud.spanner.ResultSet;
+import org.joda.time.DateTime;
+import org.joda.time.format.DateTimeFormat;
 }
 
 @members {
@@ -17,6 +19,7 @@ minisql returns [ ResultSet resultSet = null ]
         | delete_stmt { $resultSet = $delete_stmt.resultSet; }
         | select_stmt
         | create_stmt
+        | alter_stmt
         ;
 
 select_stmt /* throws NativeSqlException */
@@ -66,11 +69,26 @@ create_stmt /* throws NativeSqlException */
         : CREATE { /*throw new NativeSqlException()*/nat.useNative(); }
         ;
 
+alter_stmt /* throws NativeSqlException */
+        : ALTER { /*throw new NativeSqlException()*/nat.useNative(); }
+        ;
+
 value returns [ Value v = null ]
         : STRING { $v = new StringValue($STRING.text.substring(1,$STRING.text.length() - 1)); }
         | NUMBER { $v = new IntValue($NUMBER.text); }
         | TRUE { $v = new IntValue($TRUE.text); }
         | FALSE { $v = new IntValue($FALSE.text); }
+        | function { $v = $function.v; }
+        ;
+
+function returns [ Value v = null ]
+        : ID '(' ')' {
+            if ($ID.text.toUpperCase().equals("NOW")) {
+              $v = new StringValue(DateTimeFormat.forPattern("yyyy-MM-dd HH:mm:ss").print(DateTime.now()));
+            } else {
+              nat.unknownFunction($ID.text);
+            }
+          }
         ;
 
 where_stmt returns [ Where where = null ] locals [ List<WhereCondition> conds = new ArrayList<WhereCondition>() ]

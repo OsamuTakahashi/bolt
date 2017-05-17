@@ -297,4 +297,10 @@ class NatTest extends Specification with BeforeAfterEach {
       count must_== 8
     }
   }
+  "multiple queries" should {
+    "normally success" in {
+      // TODO: Implement this
+      true must_!= true
+    }
+  }
 }

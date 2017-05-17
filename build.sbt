@@ -31,9 +31,16 @@ val commonLibraries = Seq(
 
 parallelExecution in ThisBuild := false
 
-val projectVersion = "0.4-SNAPSHOT"
+val projectVersion = "0.5-SNAPSHOT"
 
-lazy val root = (project in file("."))
+val noJavaDoc = Seq(
+  publishArtifact in (Compile, packageDoc) := false,
+  publishArtifact in packageDoc := false,
+  publishArtifact in packageSrc := false,
+  sources in (Compile,doc) := Seq.empty
+)
+
+lazy val core = (project in file("."))
   .settings(antlr4Settings : _*)
   .settings(
     scalaVersion := projectScalaVersion,
@@ -50,4 +57,16 @@ lazy val root = (project in file("."))
       commonLibraries,
     dependencyOverrides += "io.netty" % "netty-tcnative-boringssl-static" % "1.1.33.Fork22"
   )
-  .enablePlugins(JavaAppPackaging)
+  .settings(noJavaDoc: _*)
+
+lazy val client = (project in file("client"))
+  .enablePlugins(JavaAppPackaging,UniversalPlugin)
+  .settings(
+    scalaVersion := projectScalaVersion,
+    name := "spanner-cli",
+    version := projectVersion,
+    //mappings in Universal in packageBin += file("Readme.md") -> "Readme.md",
+    bashScriptExtraDefines += """addJava "-Dconfig.file=${app_home}/../conf/application.conf"""",
+    batScriptExtraDefines += """set _JAVA_OPTS=%_JAVA_OPTS% -Dconfig.file=%EXAMPLE_CLI_HOME%\\conf\\application.conf"""
+  ).dependsOn(core)
+  .settings(noJavaDoc: _*)
