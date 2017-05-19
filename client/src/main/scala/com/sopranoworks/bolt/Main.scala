@@ -71,10 +71,12 @@ object Main extends App {
 
   val options = spannerOptions(config)
   val spanner = options.getService
+  val instance = config.getString("spanner.instance")
   val dbName = config.getString("spanner.database")
 
-  val dbClient = spanner.getDatabaseClient(DatabaseId.of(options.getProjectId, config.getString("spanner.instance"), dbName))
+  val dbClient = spanner.getDatabaseClient(DatabaseId.of(options.getProjectId, instance, dbName))
   Database.startWith(dbClient)
+  val admin = Admin(spanner.getDatabaseAdminClient,instance,dbName)
 
   Iterator
     .continually(StdIn.readLine(s"$dbName> "))
@@ -83,7 +85,7 @@ object Main extends App {
     .foreach {
       sql =>
         try {
-          Option(dbClient.executeQuery(sql)).foreach {
+          Option(dbClient.executeQuery(sql,admin)).foreach {
             res =>
               showResult(res)
               res.close()

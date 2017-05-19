@@ -20,6 +20,7 @@ minisql returns [ ResultSet resultSet = null ]
         | select_stmt
         | create_stmt
         | alter_stmt
+        | drop_stmt
         ;
 
 select_stmt /* throws NativeSqlException */
@@ -66,11 +67,15 @@ delete_stmt
         ;
 
 create_stmt /* throws NativeSqlException */
-        : CREATE { /*throw new NativeSqlException()*/nat.useNative(); }
+        : CREATE { /*throw new NativeAdminSqlException()*/nat.useAdminNative(); }
         ;
 
 alter_stmt /* throws NativeSqlException */
-        : ALTER { /*throw new NativeSqlException()*/nat.useNative(); }
+        : ALTER { /*throw new NativeAdminSqlException()*/nat.useAdminNative(); }
+        ;
+
+drop_stmt /* throws NativeSqlException */
+        : DROP { /*throw new NativeAdminSqlException()*/nat.useAdminNative(); }
         ;
 
 value returns [ Value v = null ]

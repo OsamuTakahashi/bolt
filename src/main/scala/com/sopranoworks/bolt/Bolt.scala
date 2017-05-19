@@ -26,13 +26,15 @@ object Bolt {
     private var _transactionContext: Option[TransactionContext] = None
     private var _mutations = List.empty[Mutation]
 
+    def transactionContext = _transactionContext
+
     /**
       * Executing INSERT/UPDATE/DELETE query on Google Cloud Spanner
-      * @param sql a INSERT/UPDATE/DELETE sql statement
+      * @param srcSql a INSERT/UPDATE/DELETE sql statement
       */
-    def executeQuery(sql:String): ResultSet = sql.split(";").map(_.trim).filter(!_.isEmpty).map {
-      s =>
-        val source = new ByteArrayInputStream(s.getBytes("UTF8"))
+    def executeQuery(srcSql:String,admin:Admin): ResultSet = srcSql.split(";").map(_.trim).filter(!_.isEmpty).map {
+      sql =>
+        val source = new ByteArrayInputStream(sql.getBytes("UTF8"))
         val input = new ANTLRInputStream(source)
         val lexer = new MiniSqlLexer(input)
         lexer.removeErrorListeners()
@@ -54,6 +56,16 @@ object Bolt {
                 case _ =>
                   dbClient.singleUse().executeQuery(Statement.of(sql))
               }
+            case _: NativeAdminSqlException =>
+              Option(admin) match {
+                case Some(a) =>
+                  val op = a.adminClient.updateDatabaseDdl(a.instance,a.databaes,List(sql),null)
+                  op.waitFor().getResult
+                  Database.reloadWith(dbClient)
+                case None =>
+                  _logger.warn("Could not execute administrator query")
+              }
+              null
           }
         } catch {
           case e : Exception =>
@@ -62,6 +74,8 @@ object Bolt {
             throw e
         }
     }.lastOption.orNull
+
+    def executeQuery(sql:String): ResultSet = executeQuery(sql,null)
 
     /**
       * Internal use
@@ -257,6 +271,9 @@ object Bolt {
     def useNative():Unit =
       throw new NativeSqlException
 
+    def useAdminNative():Unit =
+      throw new NativeAdminSqlException
+
     def unknownFunction(name:String):Unit =
       throw new RuntimeException(s"Unknown function $name")
 
@@ -297,7 +314,7 @@ object Bolt {
         })
     }
 
-    def sql(q:String) = executeQuery(q)
+    def sql(q:String) = executeQuery(q,null)
 
     def rollback:Unit = _transactionContext.foreach(_ => _mutations = List.empty[Mutation])
   }
@@ -365,6 +382,6 @@ object Bolt {
       Left(e)
   }
 
-  def executeQuery(sql:String)(implicit dbClient:Nat):ResultSet =
-    dbClient.executeQuery(sql)
+//  def executeQuery(sql:String)(implicit dbClient:Nat):ResultSet =
+//    dbClient.executeQuery(sql)
 }

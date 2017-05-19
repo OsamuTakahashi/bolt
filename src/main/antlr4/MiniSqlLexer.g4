@@ -33,6 +33,9 @@ CREATE  : C R E A T E
 ALTER   : A L T E R
         ;
 
+DROP    : D R O P
+        ;
+
 SELECT  : S E L E C T
         ;
 

@@ -54,12 +54,17 @@ class Database(dbClient:DatabaseClient) {
 object Database {
   private var _databases = Map.empty[DatabaseClient,Database]
 
-  def apply(dbClient:DatabaseClient) = _databases.getOrElse(dbClient,{
+  def apply(dbClient:DatabaseClient):Database = _databases.getOrElse(dbClient,{
     val db = new Database(dbClient)
     db.loadInformationSchema()
     _databases += (dbClient->db)
     db
   })
 
-  def startWith(dbClient:DatabaseClient) = apply(dbClient)
+  def startWith(dbClient:DatabaseClient):Database = apply(dbClient)
+  def reloadWith(dbClient:DatabaseClient):Database = {
+    if (_databases.contains(dbClient))
+      _databases -= dbClient
+    startWith(dbClient)
+  }
 }

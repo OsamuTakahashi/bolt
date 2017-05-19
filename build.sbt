@@ -31,7 +31,7 @@ val commonLibraries = Seq(
 
 parallelExecution in ThisBuild := false
 
-val projectVersion = "0.5-SNAPSHOT"
+val projectVersion = "0.6-SNAPSHOT"
 
 val noJavaDoc = Seq(
   publishArtifact in (Compile, packageDoc) := false,
