@@ -2,6 +2,8 @@ import sbt.Keys._
 
 val projectScalaVersion = "2.11.8"
 
+val scalaVersions = Seq("2.11.8", "2.12.2")
+
 resolvers in Global += "RustyRaven" at "http://rustyraven.github.io"
 
 resolvers in Global += "scalaz-bintray" at "http://dl.bintray.com/scalaz/releases"
@@ -18,6 +20,8 @@ val loggingLibraries = Seq(
   "ch.qos.logback" % "logback-classic" % "1.1.7"
 )
 
+val scoptLibrary = Seq("com.github.scopt" %% "scopt" % "3.4.0")
+
 val testLibraries = Seq(
   "org.specs2" %% "specs2-core" % "3.6.2" % "test",
   "org.specs2" %% "specs2-mock" % "3.6.2" % "test",
@@ -28,6 +32,8 @@ val commonLibraries = Seq(
   "joda-time" % "joda-time" % "2.9.6",
   "org.joda" % "joda-convert" % "1.8"
 )
+
+val jlineLibrary = Seq("jline" % "jline" % "2.14.3")
 
 parallelExecution in ThisBuild := false
 
@@ -44,6 +50,7 @@ lazy val core = (project in file("."))
   .settings(antlr4Settings : _*)
   .settings(
     scalaVersion := projectScalaVersion,
+    crossScalaVersions := scalaVersions,
     name := "bolt",
     organization := "com.sopranoworks",
     version := projectVersion,
@@ -67,6 +74,7 @@ lazy val client = (project in file("client"))
     version := projectVersion,
     //mappings in Universal in packageBin += file("Readme.md") -> "Readme.md",
     bashScriptExtraDefines += """addJava "-Dconfig.file=${app_home}/../conf/application.conf"""",
-    batScriptExtraDefines += """set _JAVA_OPTS=%_JAVA_OPTS% -Dconfig.file=%EXAMPLE_CLI_HOME%\\conf\\application.conf"""
+    batScriptExtraDefines += """set _JAVA_OPTS=%_JAVA_OPTS% -Dconfig.file=%EXAMPLE_CLI_HOME%\\conf\\application.conf""",
+    libraryDependencies ++= scoptLibrary ++ jlineLibrary
   ).dependsOn(core)
   .settings(noJavaDoc: _*)

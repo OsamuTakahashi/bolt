@@ -94,7 +94,7 @@ object Bolt {
         case None =>
           throw new RuntimeException(s"Table not found $tableName")
       }
-      columns.zip(values).foreach(kv=>m.set(kv._1.name).to(kv._2.text))
+      columns.zip(values).foreach(kv=>if (kv._2 != NullValue) m.set(kv._1.name).to(kv._2.text))
 
       _transactionContext match {
         case Some(_) =>
@@ -106,7 +106,7 @@ object Bolt {
 
     def insert(tableName:String,columns:java.util.List[String],values:java.util.List[Value]):Unit = {
       val m = Mutation.newInsertBuilder(tableName)
-      columns.zip(values).foreach(kv=>m.set(kv._1).to(kv._2.text))
+      columns.zip(values).foreach(kv=>if (kv._2 != NullValue) m.set(kv._1).to(kv._2.text))
       _transactionContext match {
         case Some(_) =>
           _mutations ++= List(m.build())

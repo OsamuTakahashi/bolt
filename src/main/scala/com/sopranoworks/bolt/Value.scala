@@ -13,3 +13,7 @@ case class StringValue(text:String) extends Value {
 }
 
 case class IntValue(text:String) extends Value
+
+case object NullValue extends Value {
+  override def text: String = "NULL"
+}

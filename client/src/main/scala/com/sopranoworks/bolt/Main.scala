@@ -1,6 +1,6 @@
 package com.sopranoworks.bolt
 
-import java.io.{File, FileInputStream}
+import java.io.{BufferedReader, File, FileInputStream, InputStreamReader}
 
 import com.google.auth.oauth2.GoogleCredentials
 import com.google.cloud.spanner._
@@ -69,33 +69,75 @@ object Main extends App {
     }
   }
 
-  val options = spannerOptions(config)
-  val spanner = options.getService
-  val instance = config.getString("spanner.instance")
-  val dbName = config.getString("spanner.database")
+  case class Options(instanceName:Option[String] = None,database:String = "",createDatabase:Boolean = false,password:Option[String] = None,sqls:Seq[File] = Seq.empty[File])
 
-  val dbClient = spanner.getDatabaseClient(DatabaseId.of(options.getProjectId, instance, dbName))
-  Database.startWith(dbClient)
-  val admin = Admin(spanner.getDatabaseAdminClient,instance,dbName)
+  val optParser = new scopt.OptionParser[Options]("spanner-cli") {
+    opt[String]('i',"instance").action((x,c) => c.copy(instanceName = Some(x)))
+    opt[String]('s',"secret").action((x,c) => c.copy(password = Some(x)))
+    opt[Unit]('c',"create").action((_,c) => c.copy(createDatabase = true))
+    arg[String]("database").action((x,c) => c.copy(database = x))
+//    arg[File]("<sql files> ...").unbounded().optional().action((x,c) => c.copy(sqls = c.sqls :+ x))
+  }
 
-  Iterator
-    .continually(StdIn.readLine(s"$dbName> "))
-    .withFilter(l => l != null && !l.isEmpty)
-    .takeWhile(_ != "exit")
-    .foreach {
-      sql =>
-        try {
-          Option(dbClient.executeQuery(sql,admin)).foreach {
-            res =>
-              showResult(res)
-              res.close()
-          }
-        } catch {
-          case e : com.google.cloud.spanner.SpannerException =>
-            println(e.getMessage)
-          case e : RuntimeException =>
-            println(e.getMessage)
+  optParser.parse(args,Options()) match {
+    case Some(cfg) =>
+      val options = spannerOptions(config)
+      val spanner = options.getService
+      val instance = cfg.instanceName.get//config.getString("spanner.instance")
+      val dbName = cfg.database//config.getString("spanner.database")
+
+      val admin = Admin(spanner.getDatabaseAdminClient,instance,dbName)
+      if (cfg.createDatabase) {
+        admin.adminClient.createDatabase(instance,dbName,List.empty[String].asJava).waitFor()
+      }
+
+      val dbClient = spanner.getDatabaseClient(DatabaseId.of(options.getProjectId, instance, dbName))
+      Database.startWith(dbClient)
+
+      val reader = new jline.console.ConsoleReader()
+      val stream = new BufferedReader(new InputStreamReader(System.in))
+
+      var prevString = ""
+
+      val p = System.console() != null
+
+      val it = if (!p) Iterator.continually(stream.readLine())
+        else Iterator.continually(reader.readLine(s"${if (prevString.nonEmpty) " " * dbName.length + "| " else dbName + "> "}"))
+
+//      Iterator
+//        .continually(reader.readLine(s"${if (p) {if (prevString.nonEmpty) " " * dbName.length + "| " else dbName + "> "}  else ""}"))
+//        .withFilter(l => l != null && !l.isEmpty)
+        it.takeWhile(l => l != null && l != "exit")
+        .foreach {
+          line =>
+            prevString += " " + line
+            prevString = prevString
+            var i = 0
+
+            while (i >= 0) {
+              i = prevString.indexOf(';')
+              if (i >= 0) {
+                val sql = prevString.substring(0, i)
+                prevString = prevString.drop(i + 1)
+
+                if (sql.nonEmpty) {
+                  try {
+                    Option(dbClient.executeQuery(sql, admin)).foreach {
+                      res =>
+                        showResult(res)
+                        res.close()
+                    }
+                  } catch {
+                    case e: com.google.cloud.spanner.SpannerException =>
+                      println(e.getMessage)
+                    case e: RuntimeException =>
+                      println(e.getMessage)
+                  }
+                }
+              }
+            }
         }
-    }
-  spanner.closeAsync()
+      spanner.closeAsync()
+    case None =>
+  }
 }

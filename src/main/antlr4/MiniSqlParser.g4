@@ -83,6 +83,8 @@ value returns [ Value v = null ]
         | NUMBER { $v = new IntValue($NUMBER.text); }
         | TRUE { $v = new IntValue($TRUE.text); }
         | FALSE { $v = new IntValue($FALSE.text); }
+        | NULL { $v = NullValue$.MODULE$; }
+        | /* empty */ { $v = NullValue$.MODULE$; }
         | function { $v = $function.v; }
         ;
 

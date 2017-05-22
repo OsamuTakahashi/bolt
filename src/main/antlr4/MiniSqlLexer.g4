@@ -93,6 +93,9 @@ TRUE    : T R U E
 FALSE   : F A L S E
         ;
 
+NULL    : N U L L
+        ;
+
 EQ      : '='
         ;
 
