@@ -9,18 +9,25 @@ import org.joda.time.format.DateTimeFormat;
 
 @members {
     Bolt.Nat nat = null;
+    Admin admin = null;
     String currentTable = null;
 }
 
 
 minisql returns [ ResultSet resultSet = null ]
+        : stmt { $resultSet = $stmt.resultSet; } ( ';' stmt { $resultSet = $stmt.resultSet; })* ';'?
+        ;
+
+stmt returns [ ResultSet resultSet = null ]
         : insert_stmt { $resultSet = $insert_stmt.resultSet; }
         | update_stmt { $resultSet = $update_stmt.resultSet; }
         | delete_stmt { $resultSet = $delete_stmt.resultSet; }
         | select_stmt
-        | create_stmt
+        | create_stmt { nat.executeNativeAdminQuery(admin,$create_stmt.text); }
         | alter_stmt
-        | drop_stmt
+        | drop_stmt { nat.executeNativeAdminQuery(admin,$drop_stmt.text); }
+        | show_stmt { $resultSet = $show_stmt.resultSet; }
+        | /* empty */
         ;
 
 select_stmt /* throws NativeSqlException */
@@ -29,14 +36,22 @@ select_stmt /* throws NativeSqlException */
 
 insert_stmt returns [ ResultSet resultSet = null ]
             locals [
-              List<String> columns = new ArrayList<String>()
+              List<String> columns = new ArrayList<String>(),
+              List< List<Value> > bulkValues = new ArrayList<List<Value>>()
             ]
         : INSERT INTO? tbl=ID ( '(' ID { $columns.add($ID.text); } (',' ID { $columns.add($ID.text); } )*  ')' )?
-            VALUES values ';'? {
+            VALUES values {
               if ($columns.size() == 0)
                 nat.insert($tbl.text,$values.valueList);
               else
                 nat.insert($tbl.text,$columns,$values.valueList);
+            }
+        | INSERT INTO? tbl=ID ( '(' ID { $columns.add($ID.text); } (',' ID { $columns.add($ID.text); } )*  ')' )?
+            VALUES values { $bulkValues.add($values.valueList); } (',' values { $bulkValues.add($values.valueList); }) + {
+              if ($columns.size() == 0)
+                nat.bulkInsert($tbl.text,$bulkValues);
+              else
+                nat.bulkInsert($tbl.text,$columns,$bulkValues);
             }
         ;
 
@@ -45,7 +60,7 @@ update_stmt
             locals [
               List<KeyValue> kvs = new ArrayList<KeyValue>()
             ]
-        : UPDATE ID { currentTable = $ID.text; } SET ID EQ value { $kvs.add(new KeyValue($ID.text,$value.v.text())); } ( ',' ID EQ value { $kvs.add(new KeyValue($ID.text,$value.v.text())); } )* where_stmt ( LIMIT ln=NUMBER )? ';'? {
+        : UPDATE ID { currentTable = $ID.text; } SET ID EQ value { $kvs.add(new KeyValue($ID.text,$value.v.text())); } ( ',' ID EQ value { $kvs.add(new KeyValue($ID.text,$value.v.text())); } )* where_stmt ( LIMIT ln=NUMBER )? {
             if ($where_stmt.where.onlyPrimaryKey()) {
               nat.update(currentTable,$kvs,$where_stmt.where);
             } else {
@@ -58,16 +73,65 @@ update_stmt
           }
         ;
 
-delete_stmt
-            returns [ ResultSet resultSet = null ]
+delete_stmt returns [ ResultSet resultSet = null ]
             locals [ Where where = null ]
-        : DELETE FROM ID { currentTable = $ID.text; } (where_stmt { $where = $where_stmt.where; })? ';'? {
+        : DELETE FROM ID { currentTable = $ID.text; } (where_stmt { $where = $where_stmt.where; })? {
             nat.delete(currentTable,$where);
           }
         ;
 
 create_stmt /* throws NativeSqlException */
-        : CREATE { /*throw new NativeAdminSqlException()*/nat.useAdminNative(); }
+        : CREATE TABLE create_table
+        | CREATE (UNIQUE)? (NULL_FILTERED)? INDEX create_index
+        | CREATE DATABASE ID
+        ;
+
+create_table
+        : ID '(' column_def (',' column_def )* ')' primary_key (',' cluster )?
+        ;
+
+column_def
+        : ID (scalar_type | array_type) (NOT NULL)?
+        ;
+
+primary_key
+        : PRIMARY KEY '(' key_part ( ',' key_part )* ')'
+        ;
+
+key_part: ID (ASC | DESC)?
+        ;
+
+cluster : INTERLEAVE IN PARENT ID ( ON DELETE ( CASCADE | NO ACTION ) )?
+        ;
+
+scalar_type
+        : BOOL
+        | INT64
+        | FLOAT64
+        | STRING_TYPE '(' length ')'
+        | BYTES '(' length ')'
+        | DATE
+        | TIMESTAMP
+        ;
+
+length  : NUMBER
+        | MAX
+        ;
+
+array_type
+        : ARRAY '<' scalar_type '>'
+        ;
+
+create_index
+        :  ID ON ID '(' key_part (',' key_part )* ')' (storing_clause (',' interleave_clause) | interleave_clause)?
+        ;
+
+storing_clause
+        : STORING '(' ID (',' ID)* ')'
+        ;
+
+interleave_clause
+        : INTERLEAVE IN ID
         ;
 
 alter_stmt /* throws NativeSqlException */
@@ -75,7 +139,13 @@ alter_stmt /* throws NativeSqlException */
         ;
 
 drop_stmt /* throws NativeSqlException */
-        : DROP { /*throw new NativeAdminSqlException()*/nat.useAdminNative(); }
+        : DROP TABLE ID
+        | DROP INDEX ID
+        ;
+
+show_stmt returns [ ResultSet resultSet = null ]
+        : SHOW TABLES { $resultSet = nat.showTables(); }
+        | SHOW (FULL)? COLUMNS (FROM|IN) ID  { $resultSet = nat.showColumns($ID.text); }
         ;
 
 value returns [ Value v = null ]

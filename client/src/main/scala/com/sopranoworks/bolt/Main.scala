@@ -27,6 +27,7 @@ object Main extends App {
         val is = new FileInputStream(new File(json))
         options.setCredentials(GoogleCredentials.fromStream(is))
     }
+    options.setProjectId("bandainamco-scream")
     options.build()
   }
 
@@ -36,8 +37,9 @@ object Main extends App {
       resultSet.foreach {
         r =>
           if (first) {
-            val f = r.getCurrentRowAsStruct.getType.getStructFields
-            println(f.asScala.map(_.getName).mkString("\t"))
+            val f = r.getCurrentRowAsStruct.getType.getStructFields.asScala
+            println(f.map(_.getName).mkString("\t"))
+            println(f.map("-" * _.getName.length).mkString("\t"))
             first = false
           }
           println((0 until r.getColumnCount).map {
@@ -66,6 +68,15 @@ object Main extends App {
       }
     } finally {
       resultSet.close()
+    }
+  }
+
+  private def _removeComment(line:String):String = {
+    val i = line.indexOf("--")
+    if (i >= 0) {
+      line.substring(0,i)
+    } else {
+      line
     }
   }
 
@@ -110,7 +121,7 @@ object Main extends App {
         it.takeWhile(l => l != null && l != "exit")
         .foreach {
           line =>
-            prevString += " " + line
+            prevString += " " + _removeComment(line)
             prevString = prevString
             var i = 0
 
@@ -137,7 +148,7 @@ object Main extends App {
               }
             }
         }
-      spanner.closeAsync()
+      spanner.close()
     case None =>
   }
 }

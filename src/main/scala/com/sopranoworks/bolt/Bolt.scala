@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory
 
 import scala.collection.AbstractIterator
 import scala.collection.JavaConversions._
+import scala.collection.JavaConverters._
 
 /**
   * Created by takahashi on 2017/03/28.
@@ -42,6 +43,7 @@ object Bolt {
         val tokenStream = new CommonTokenStream(lexer)
         val parser = new MiniSqlParser(tokenStream)
         parser.nat = this
+        parser.admin = admin
         parser.removeErrorListeners()
 
         try {
@@ -112,6 +114,56 @@ object Bolt {
           _mutations ++= List(m.build())
         case _ =>
           dbClient.write(List(m.build()))
+      }
+    }
+
+    def bulkInsert(tableName:String,columns:java.util.List[String],values:java.util.List[java.util.List[Value]]):Unit = {
+      val mm = values.map {
+        v =>
+          val m = Mutation.newInsertBuilder(tableName)
+          columns.zip(v).foreach(kv=>if (kv._2 != NullValue) m.set(kv._1).to(kv._2.text))
+          m.build()
+      }
+
+      _transactionContext match {
+        case Some(_) =>
+          _mutations ++= mm
+        case _ =>
+          dbClient.write(mm)
+      }
+    }
+
+    def bulkInsert(tableName:String,values:java.util.List[java.util.List[Value]]):Unit = {
+      val m = Mutation.newInsertBuilder(tableName)
+      val columns = Database(dbClient).table(tableName) match {
+        case Some(tbl) =>
+          tbl.columns
+        case None =>
+          throw new RuntimeException(s"Table not found $tableName")
+      }
+      val mm = values.map {
+        v =>
+          val m = Mutation.newInsertBuilder(tableName)
+          columns.zip(v).foreach(kv=>if (kv._2 != NullValue) m.set(kv._1.name).to(kv._2.text))
+          m.build()
+      }
+
+      _transactionContext match {
+        case Some(_) =>
+          _mutations ++= mm
+        case _ =>
+          dbClient.write(mm)
+      }
+    }
+
+    def executeNativeAdminQuery(admin:Admin,sql:String):Unit = {
+      Option(admin) match {
+        case Some(a) =>
+          val op = a.adminClient.updateDatabaseDdl(a.instance,a.databaes,List(sql),null)
+          op.waitFor().getResult
+          Database.reloadWith(dbClient)
+        case None =>
+          _logger.warn("Could not execute administrator query")
       }
     }
 
@@ -261,6 +313,13 @@ object Bolt {
         case _ =>
       }
     }
+
+    def showTables():ResultSet = {
+      dbClient.singleUse().executeQuery(Statement.of("SELECT TABLE_NAME,PARENT_TABLE_NAME,ON_DELETE_ACTION FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA=\"\""))
+    }
+
+    def showColumns(table:String):ResultSet =
+      dbClient.singleUse().executeQuery(Statement.of(s"SELECT COLUMN_NAME,SPANNER_TYPE,IS_NULLABLE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='$table' ORDER BY ORDINAL_POSITION"))
 
     /**
       * Internal use
