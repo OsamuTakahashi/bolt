@@ -3,6 +3,7 @@ options { tokenVocab=MiniSqlLexer; }
 
 @header {
 import com.google.cloud.spanner.ResultSet;
+import com.google.cloud.Timestamp;
 import org.joda.time.DateTime;
 import org.joda.time.format.DateTimeFormat;
 }
@@ -161,7 +162,8 @@ value returns [ Value v = null ]
 function returns [ Value v = null ]
         : ID '(' ')' {
             if ($ID.text.toUpperCase().equals("NOW")) {
-              $v = new StringValue(DateTimeFormat.forPattern("yyyy-MM-dd HH:mm:ss").print(DateTime.now()));
+              Timestamp ts = Timestamp.now();
+              $v = new StringValue(ts.toString());
             } else {
               nat.unknownFunction($ID.text);
             }

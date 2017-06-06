@@ -7,6 +7,7 @@ import com.google.cloud.spanner.TransactionRunner.TransactionCallable
 import com.google.cloud.spanner._
 import org.antlr.v4.runtime._
 import org.slf4j.LoggerFactory
+import shapeless.HNil
 
 import scala.collection.AbstractIterator
 import scala.collection.JavaConversions._
@@ -337,18 +338,19 @@ object Bolt {
       throw new RuntimeException(s"Unknown function $name")
 
 
-    def beginTransaction(f:Nat => Unit):Unit = {
+    def beginTransaction[T](f:Nat => T):T = {
       val self = this
       dbClient.readWriteTransaction()
-        .run(new TransactionCallable[Unit] {
-          override def run(transaction: TransactionContext): Unit = {
+        .run(new TransactionCallable[T] {
+          override def run(transaction: TransactionContext): T = {
             _transactionContext = Some(transaction)
-            f(self)
+            val r = f(self)
             if (_mutations.nonEmpty) {
               transaction.buffer(_mutations)
             }
             _transactionContext = None
             _mutations = List.empty[Mutation]
+            r
           }
         })
     }
@@ -357,18 +359,19 @@ object Bolt {
       * For java
       * @param t
       */
-    def beginTransaction(t:Transaction):Unit = {
+    def beginTransaction[T](t:Transaction[T]):T = {
       val self = this
       dbClient.readWriteTransaction()
-        .run(new TransactionCallable[Unit] {
-          override def run(transaction: TransactionContext): Unit = {
+        .run(new TransactionCallable[T] {
+          override def run(transaction: TransactionContext): T = {
             _transactionContext = Some(transaction)
-            t.run(self)
+            val r = t.run(self)
             if (_mutations.nonEmpty) {
               transaction.buffer(_mutations)
             }
             _transactionContext = None
             _mutations = List.empty[Mutation]
+            r
           }
         })
     }
@@ -378,8 +381,8 @@ object Bolt {
     def rollback:Unit = _transactionContext.foreach(_ => _mutations = List.empty[Mutation])
   }
 
-  trait Transaction {
-    def run(nat:Nat):Unit
+  trait Transaction[T] {
+    def run(nat:Nat):T
   }
 
 
@@ -392,6 +395,8 @@ object Bolt {
 
   implicit class Washer(resultSet: ResultSet) {
     def iterator = resultSetToIterator(resultSet)
+    def headOption:Option[ResultSet] =
+      if (resultSet.next()) Some(resultSet) else None
   }
 
   implicit class SafeResultSet(resultSet: ResultSet) {
