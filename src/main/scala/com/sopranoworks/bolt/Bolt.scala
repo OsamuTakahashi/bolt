@@ -39,13 +39,13 @@ object Bolt {
         val source = new ByteArrayInputStream(sql.getBytes("UTF8"))
         val input = new ANTLRInputStream(source)
         val lexer = new MiniSqlLexer(input)
-        lexer.removeErrorListeners()
+//        lexer.removeErrorListeners()
 
         val tokenStream = new CommonTokenStream(lexer)
         val parser = new MiniSqlParser(tokenStream)
         parser.nat = this
         parser.admin = admin
-        parser.removeErrorListeners()
+//        parser.removeErrorListeners()
 
         try {
           try {
@@ -97,8 +97,14 @@ object Bolt {
         case None =>
           throw new RuntimeException(s"Table not found $tableName")
       }
-      columns.zip(values).foreach(kv=>if (kv._2 != NullValue) m.set(kv._1.name).to(kv._2.text))
 
+      columns.zip(values).foreach {
+        case (k, NullValue) =>
+        case (k, ArrayValue(v)) =>
+          m.set(k.name).toStringArray(v)
+        case (k, v) =>
+          m.set(k.name).to(v.text)
+      }
       _transactionContext match {
         case Some(_) =>
           _mutations ++= List(m.build())
@@ -109,7 +115,13 @@ object Bolt {
 
     def insert(tableName:String,columns:java.util.List[String],values:java.util.List[Value]):Unit = {
       val m = Mutation.newInsertBuilder(tableName)
-      columns.zip(values).foreach(kv=>if (kv._2 != NullValue) m.set(kv._1).to(kv._2.text))
+      columns.zip(values).foreach {
+        case (k, NullValue) =>
+        case (k, ArrayValue(v)) =>
+          m.set(k).toStringArray(v)
+        case (k, v) =>
+          m.set(k).to(v.text)
+      }
       _transactionContext match {
         case Some(_) =>
           _mutations ++= List(m.build())

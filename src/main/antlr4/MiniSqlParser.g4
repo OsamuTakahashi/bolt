@@ -25,14 +25,110 @@ stmt returns [ ResultSet resultSet = null ]
         | delete_stmt { $resultSet = $delete_stmt.resultSet; }
         | select_stmt
         | create_stmt { nat.executeNativeAdminQuery(admin,$create_stmt.text); }
-        | alter_stmt
+        | alter_stmt  { nat.executeNativeAdminQuery(admin,$alter_stmt.text); }
         | drop_stmt { nat.executeNativeAdminQuery(admin,$drop_stmt.text); }
         | show_stmt { $resultSet = $show_stmt.resultSet; }
         | /* empty */
         ;
 
+//query_stmt
+//        : table_hint_expr? join_hint_expr? query_expr
+//        ;
+//
+//query_expr
+//        :  ( select_stmt | '(' query_expr ')' | query_expr set_op query_expr )(ORDER BY expression (ASC|DESC)? (',' expression (ASC|DESC)? )* )? ( LIMIT count ( OFFSET skip_rows )? )?
+//        ;
+
+
 select_stmt /* throws NativeSqlException */
-        : SELECT { /*throw new NativeSqlException()*/nat.useNative(); }
+        : SELECT { /*throw new NativeSqlException()*/nat.useNative(); } (ALL|DISTINCT)? ('*' | expression ( AS? alias )? ) ( FROM from_item )? ( WHERE bool_expression )? ( GROUP BY expression (',' expression)* )? ( HAVING bool_expression )?
+        ;
+
+set_op  : UNION (ALL|DISTINCT)
+        ;
+
+
+from_item
+        : table_name (table_hint_expr (AS? alias)? )?
+        /*| join
+         | '(' query_expr ')' table_hint_expr? (AS? alias)?
+        | field_path
+        | ( UNNEST '(' array_expr ')' | UNNEST '(' array_path ')' | array_path ) table_hint_expr? (AS? alias) (WITH OFFSET (AS? alias)? )? */
+        ;
+
+table_hint_expr
+        : '@' '{' table_hint_key '=' table_hint_value '}'
+        ;
+
+table_name
+        : ID
+        ;
+
+alias   : ID
+        ;
+
+count   : NUMBER
+        ;
+
+skip_rows
+        : NUMBER
+        ;
+
+
+
+table_hint_key
+        : FORCE_INDEX
+        ;
+
+
+table_hint_value
+        : ID
+        ;
+
+expression
+        : column_name
+        ;
+
+bool_expression
+        : expression bool_op expression
+        ;
+
+
+bool_op : cond
+        | rel
+        ;
+
+column_name
+        : table_name '.' ID
+        | ID
+        ;
+
+
+join    : from_item join_type? join_method JOIN join_hint_expr? from_item ( ON bool_expression | USING '(' join_column (',' join_column)* ')' )?
+        ;
+
+join_type
+        : INNER | CROSS | FULL OUTER? | LEFT OUTER? | RIGHT OUTER?
+        ;
+
+join_method
+        : HASH
+        ;
+
+join_hint_expr
+        : '@' '{' join_hint_key '=' join_hint_value (',' join_hint_value)* '}'
+        ;
+
+join_hint_key
+        : FORCE_JOIN_ORDER | JOIN_TYPE
+        ;
+
+join_column
+        : column_name /* temporary */
+        ;
+
+join_hint_value
+        : ID /* temporary */
         ;
 
 insert_stmt returns [ ResultSet resultSet = null ]
@@ -135,8 +231,15 @@ interleave_clause
         : INTERLEAVE IN ID
         ;
 
-alter_stmt /* throws NativeSqlException */
-        : ALTER { /*throw new NativeAdminSqlException()*/nat.useAdminNative(); }
+alter_stmt returns [ ResultSet resultSet = null ]
+        : ALTER TABLE ID table_alteration
+        ;
+
+table_alteration
+        : ADD COLUMN column_def
+        | ALTER COLUMN column_def
+        | DROP COLUMN column_name
+        | SET ON DELETE (CASCADE| NO ACTION)
         ;
 
 drop_stmt /* throws NativeSqlException */
@@ -150,14 +253,28 @@ show_stmt returns [ ResultSet resultSet = null ]
         ;
 
 value returns [ Value v = null ]
+        : scalar_value { $v = $scalar_value.v; }
+        | array_value { $v = $array_value.v; }
+        | /* empty */ { $v = NullValue$.MODULE$; }
+        ;
+
+array_value returns [ Value v = null ]
+        locals [ List<String> vlist = new ArrayList<String>(); ]
+        : '(' (scalar_value { $vlist.add($scalar_value.v.text()); } (',' scalar_value { $vlist.add($scalar_value.v.text()); })* )? ')' {
+            $v = new ArrayValue($vlist);
+          }
+        ;
+
+scalar_value  returns [ Value v = null ]
         : STRING { $v = new StringValue($STRING.text.substring(1,$STRING.text.length() - 1)); }
         | NUMBER { $v = new IntValue($NUMBER.text); }
         | TRUE { $v = new IntValue($TRUE.text); }
         | FALSE { $v = new IntValue($FALSE.text); }
         | NULL { $v = NullValue$.MODULE$; }
-        | /* empty */ { $v = NullValue$.MODULE$; }
         | function { $v = $function.v; }
         ;
+
+
 
 function returns [ Value v = null ]
         : ID '(' ')' {

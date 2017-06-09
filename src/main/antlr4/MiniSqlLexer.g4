@@ -66,7 +66,40 @@ SET     : S E T
 LIMIT   : L I M I T
         ;
 
+ADD     : A D D
+        ;
+
+OFFSET  : O F F S E T
+        ;
+
+HAVING  : H V I N G
+        ;
+
+ORDER   : O R D E R
+        ;
+
+GROUP   : G R O U P
+        ;
+
+JOIN    : J O I N
+        ;
+
+UNION   : U N I O N
+        ;
+
 FROM    : F R O M
+        ;
+
+BY      : B Y
+        ;
+
+AS      : A S
+        ;
+
+ALL     : A L L
+        ;
+
+DISTINCT: D I S T I N C T
         ;
 
 INDEX   : I N D E X
@@ -76,6 +109,30 @@ FULL    : F U L L
         ;
 
 COLUMNS : C O L U M N S
+        ;
+
+COLUMN  : C O L U M N
+        ;
+
+USING   : U S I N G
+        ;
+
+INNER   : I N N E R
+        ;
+
+OUTER   : O U T E R
+        ;
+
+LEFT    : L E F T
+        ;
+
+RIGHT   : R I G H T
+        ;
+
+CROSS   : C R O S S
+        ;
+
+HASH   : H A S H
         ;
 
 OR      : O R
@@ -158,6 +215,18 @@ ASC     : A S C
 DESC    : D E S C
         ;
 
+FORCE_INDEX
+        : F O R C E '_' I N D E X
+        ;
+
+FORCE_JOIN_ORDER
+        : F O R C E '_' J O I N '_' O R D E R
+        ;
+
+JOIN_TYPE
+        : J O I N '_' T Y P E
+        ;
+
 BOOL    : B O O L
         ;
 
@@ -217,6 +286,9 @@ SC      : ';'
 CN      : ','
         ;
 
+DOT     : '.'
+        ;
+
 AR      : '*'
         ;
 
@@ -224,6 +296,15 @@ MIN     : '-'
         ;
 
 SP      : '#'
+        ;
+
+AT      : '@'
+        ;
+
+BRB     : '{'
+        ;
+
+BRE     : '}'
         ;
 
 ID      : [a-zA-Z_][a-zA-Z0-9_]*

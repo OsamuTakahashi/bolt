@@ -41,6 +41,8 @@ val jlineLibrary = Seq("jline" % "jline" % "2.14.3")
 
 parallelExecution in ThisBuild := false
 
+fork in run := true
+
 val projectVersion = "0.8-SNAPSHOT"
 
 val noJavaDoc = Seq(
