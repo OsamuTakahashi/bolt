@@ -31,7 +31,80 @@ object Main extends App {
     options.build()
   }
 
+  def printRow(columnLength:Array[Int],columns:List[String]):Unit = {
+    var i = 0
+    columns.foreach {
+      col =>
+        val l = col.length
+        print(col)
+        print(" " * (columnLength(i) - l + 1))
+        i += 1
+    }
+    print("\n")
+  }
+
+
   def showResult(resultSet : ResultSet):Unit = {
+    var columnLength = Array.empty[Int]
+    var header = List.empty[String]
+    var first = true
+    try {
+      val rows = resultSet.map {
+        r =>
+          if (first) {
+            val f = r.getCurrentRowAsStruct.getType.getStructFields.asScala
+            header = f.map(_.getName).toList
+            columnLength = header.map(_.length).toArray
+            first = false
+          }
+          (0 until r.getColumnCount).map {
+            i =>
+              val c = if (r.isNull(i)) "NULL"
+              else {
+                r.getColumnType(i) match {
+                  case v if v == Type.bool() =>
+                    r.getBoolean(i).toString
+                  case v if v == Type.int64() =>
+                    r.getLong(i).toString
+                  case v if v == Type.float64() =>
+                    r.getDouble(i).toString
+                  case v if v == Type.string() =>
+                    r.getString(i)
+                  case v if v == Type.timestamp() =>
+                    r.getTimestamp(i).toString
+                  case v if v == Type.date() =>
+                    r.getDate(i).toString
+                  case v if v == Type.array(Type.bool()) =>
+                    s"(${r.getBooleanArray(i).mkString(",")})"
+                  case v if v == Type.array(Type.int64()) =>
+                    s"(${r.getLongArray(i).mkString(",")})"
+                  case v if v == Type.array(Type.float64()) =>
+                    s"(${r.getDoubleArray(i).mkString(",")})"
+                  case v if v == Type.array(Type.string()) =>
+                    s"(${r.getStringList(i).asScala.mkString(",")})"
+                  case v if v == Type.array(Type.timestamp()) =>
+                    s"(${r.getTimestampList(i).asScala.mkString(",")})"
+                  case v if v == Type.array(Type.date()) =>
+                    s"(${r.getDateList(i).asScala.mkString(",")})"
+                  case t =>
+                    s"Unknown($t)"
+                }
+              }
+              val l = c.length
+              if (l > columnLength(i)) columnLength(i) = l
+              c
+          }.toList
+      }.toList
+
+      printRow(columnLength,header)
+      printRow(columnLength,header.map("-" * _.length))
+      rows.foreach(r=>printRow(columnLength,r))
+    } finally {
+      resultSet.close()
+    }
+  }
+
+  /*def showResult(resultSet : ResultSet):Unit = {
     var first = true
     try {
       resultSet.foreach {
@@ -81,7 +154,7 @@ object Main extends App {
     } finally {
       resultSet.close()
     }
-  }
+  } */
 
   private def _removeComment(line:String):String = {
     val i = line.indexOf("--")
@@ -92,22 +165,22 @@ object Main extends App {
     }
   }
 
-  case class Options(instanceName:Option[String] = None,database:String = "",createDatabase:Boolean = false,password:Option[String] = None,sqls:Seq[File] = Seq.empty[File])
+  case class Options(projectId:Option[String] = None,instanceName:Option[String] = None,database:String = "",createDatabase:Boolean = false,password:Option[String] = None,sqls:Seq[File] = Seq.empty[File])
 
   val optParser = new scopt.OptionParser[Options]("spanner-cli") {
+    opt[String]('p',"projectId").action((x,c) => c.copy(projectId = Some(x)))
     opt[String]('i',"instance").action((x,c) => c.copy(instanceName = Some(x)))
     opt[String]('s',"secret").action((x,c) => c.copy(password = Some(x)))
     opt[Unit]('c',"create").action((_,c) => c.copy(createDatabase = true))
     arg[String]("database").action((x,c) => c.copy(database = x))
-//    arg[File]("<sql files> ...").unbounded().optional().action((x,c) => c.copy(sqls = c.sqls :+ x))
   }
 
   optParser.parse(args,Options()) match {
     case Some(cfg) =>
       val options = spannerOptions(config)
       val spanner = options.getService
-      val instance = cfg.instanceName.get//config.getString("spanner.instance")
-      val dbName = cfg.database//config.getString("spanner.database")
+      val instance = cfg.instanceName.get
+      val dbName = cfg.database
 
       val admin = Admin(spanner.getDatabaseAdminClient,instance,dbName)
       if (cfg.createDatabase) {
@@ -127,11 +200,7 @@ object Main extends App {
       val it = if (!p) Iterator.continually(stream.readLine())
         else Iterator.continually(reader.readLine(s"${if (prevString.nonEmpty) " " * dbName.length + "| " else dbName + "> "}"))
 
-//      Iterator
-//        .continually(reader.readLine(s"${if (p) {if (prevString.nonEmpty) " " * dbName.length + "| " else dbName + "> "}  else ""}"))
-//        .withFilter(l => l != null && !l.isEmpty)
-        it.takeWhile(l => l != null && l != "exit")
-        .foreach {
+        it.takeWhile(l => l != null && l != "exit").foreach {
           line =>
             prevString += " " + _removeComment(line)
             prevString = prevString

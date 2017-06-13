@@ -11,7 +11,7 @@ resolvers in Global += "scalaz-bintray" at "http://dl.bintray.com/scalaz/release
 val codebookLibrary = Seq("com.rustyraven" %% "codebook-runtime" % "1.3-SNAPSHOT")
 
 val spannerClientLibraries = Seq(
-  "com.google.cloud" % "google-cloud-spanner" % "0.18.0-beta",
+  "com.google.cloud" % "google-cloud-spanner" % "0.19.0-beta",
   "com.google.auth" % "google-auth-library-oauth2-http" % "0.6.0",
   "com.google.guava" % "guava" % "21.0"
 ) 
@@ -43,7 +43,7 @@ parallelExecution in ThisBuild := false
 
 fork in run := true
 
-val projectVersion = "0.8-SNAPSHOT"
+val projectVersion = "0.8.1-SNAPSHOT"
 
 val noJavaDoc = Seq(
   publishArtifact in (Compile, packageDoc) := false,
@@ -79,9 +79,16 @@ lazy val client = (project in file("client"))
     scalaVersion := projectScalaVersion,
     name := "spanner-cli",
     version := projectVersion,
-    //mappings in Universal in packageBin += file("Readme.md") -> "Readme.md",
-    bashScriptExtraDefines += """addJava "-Dconfig.file=${app_home}/../conf/application.conf"""",
-    batScriptExtraDefines += """set _JAVA_OPTS=%_JAVA_OPTS% -Dconfig.file=%EXAMPLE_CLI_HOME%\\conf\\application.conf""",
+//    assemblyJarName := "spanner-cli.jar",
+//    scriptClasspath := Seq( assemblyJarName.value ),
+//    mappings in Universal := {
+//        val universalMappings = (mappings in Universal).value
+//        val fatJar = (assembly in Compile).value
+//        val filtered = universalMappings filter {
+//            case (file, name) =>  ! name.endsWith(".jar")
+//        }
+//        filtered :+ (fatJar -> ("lib/" + fatJar.getName))
+//    },
     libraryDependencies ++= scoptLibrary ++ jlineLibrary
   ).dependsOn(core)
   .settings(noJavaDoc: _*)

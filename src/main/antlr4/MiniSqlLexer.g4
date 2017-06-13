@@ -51,6 +51,9 @@ DELETE  : D E L E T E
 SHOW    : S H O W
         ;
 
+DESCRIBE: D E S C R I B E
+        ;
+
 VALUES  : V A L U E S
         ;
 

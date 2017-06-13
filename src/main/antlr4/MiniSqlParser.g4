@@ -157,7 +157,7 @@ update_stmt
             locals [
               List<KeyValue> kvs = new ArrayList<KeyValue>()
             ]
-        : UPDATE ID { currentTable = $ID.text; } SET ID EQ value { $kvs.add(new KeyValue($ID.text,$value.v.text())); } ( ',' ID EQ value { $kvs.add(new KeyValue($ID.text,$value.v.text())); } )* where_stmt ( LIMIT ln=NUMBER )? {
+        : UPDATE ID { currentTable = $ID.text; } SET ID EQ value { $kvs.add(new KeyValue($ID.text,$value.v)); } ( ',' ID EQ value { $kvs.add(new KeyValue($ID.text,$value.v)); } )* where_stmt ( LIMIT ln=NUMBER )? {
             if ($where_stmt.where.onlyPrimaryKey()) {
               nat.update(currentTable,$kvs,$where_stmt.where);
             } else {
@@ -250,6 +250,7 @@ drop_stmt /* throws NativeSqlException */
 show_stmt returns [ ResultSet resultSet = null ]
         : SHOW TABLES { $resultSet = nat.showTables(); }
         | SHOW (FULL)? COLUMNS (FROM|IN) ID  { $resultSet = nat.showColumns($ID.text); }
+        | (DESC|DESCRIBE) ID  { $resultSet = nat.showColumns($ID.text); }
         ;
 
 value returns [ Value v = null ]

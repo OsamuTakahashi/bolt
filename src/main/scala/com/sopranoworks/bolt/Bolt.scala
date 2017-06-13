@@ -134,7 +134,14 @@ object Bolt {
       val mm = values.map {
         v =>
           val m = Mutation.newInsertBuilder(tableName)
-          columns.zip(v).foreach(kv=>if (kv._2 != NullValue) m.set(kv._1).to(kv._2.text))
+//          columns.zip(v).foreach(kv=>if (kv._2 != NullValue) m.set(kv._1).to(kv._2.text))
+          columns.zip(v).foreach {
+            case (k, NullValue) =>
+            case (k, ArrayValue(v)) =>
+              m.set(k).toStringArray(v)
+            case (k, v) =>
+              m.set(k).to(v.text)
+          }
           m.build()
       }
 
@@ -157,7 +164,14 @@ object Bolt {
       val mm = values.map {
         v =>
           val m = Mutation.newInsertBuilder(tableName)
-          columns.zip(v).foreach(kv=>if (kv._2 != NullValue) m.set(kv._1.name).to(kv._2.text))
+//          columns.zip(v).foreach(kv=>if (kv._2 != NullValue) m.set(kv._1.name).to(kv._2.text))
+          columns.zip(v).foreach {
+            case (k, NullValue) =>
+            case (k, ArrayValue(v)) =>
+              m.set(k.name).toStringArray(v)
+            case (k, v) =>
+              m.set(k.name).to(v.text)
+          }
           m.build()
       }
 
@@ -212,7 +226,14 @@ object Bolt {
         case PrimaryKeyWhere(k,v) =>
           val m = Mutation.newUpdateBuilder(tableName)
           m.set(k).to(v)
-          keysAndValues.foreach(kv=>m.set(kv.key).to(kv.value))
+//          keysAndValues.foreach(kv=>m.set(kv.key).to(kv.value))
+          keysAndValues.map(kv=>(kv.key,kv.value)).foreach {
+            case (k, NullValue) =>
+            case (k, ArrayValue(v)) =>
+              m.set(k).toStringArray(v)
+            case (k, v) =>
+              m.set(k).to(v.text)
+          }
 
           _transactionContext match {
             case Some(_) =>
@@ -226,7 +247,14 @@ object Bolt {
             vv=>
               val m = Mutation.newUpdateBuilder(tableName)
               m.set(k).to(vv.text)
-              keysAndValues.foreach(kv=>m.set(kv.key).to(kv.value))
+//              keysAndValues.foreach(kv=>m.set(kv.key).to(kv.value))
+              keysAndValues.map(kv=>(kv.key,kv.value)).foreach {
+                case (k, NullValue) =>
+                case (k, ArrayValue(v)) =>
+                  m.set(k).toStringArray(v)
+                case (k, v) =>
+                  m.set(k).to(v.text)
+              }
               m.build()
           }
           _transactionContext match {
@@ -247,8 +275,14 @@ object Bolt {
                   k =>
                     val m = Mutation.newUpdateBuilder(tableName)
                     m.set(key).to(k)
-                    keysAndValues.foreach(kv=>m.set(kv.key).to(kv.value))
-
+//                    keysAndValues.foreach(kv=>m.set(kv.key).to(kv.value))
+                    keysAndValues.map(kv=>(kv.key,kv.value)).foreach {
+                      case (k, NullValue) =>
+                      case (k, ArrayValue(v)) =>
+                        m.set(k).toStringArray(v)
+                      case (k, v) =>
+                        m.set(k).to(v.text)
+                    }
                     m.build()
                 }
                 _mutations ++= ml
@@ -265,8 +299,14 @@ object Bolt {
                         k =>
                           val m = Mutation.newUpdateBuilder(tableName)
                           m.set(key).to(k)
-                          keysAndValues.foreach(kv=>m.set(kv.key).to(kv.value))
-
+//                          keysAndValues.foreach(kv=>m.set(kv.key).to(kv.value))
+                          keysAndValues.map(kv=>(kv.key,kv.value)).foreach {
+                            case (k, NullValue) =>
+                            case (k, ArrayValue(v)) =>
+                              m.set(k).toStringArray(v)
+                            case (k, v) =>
+                              m.set(k).to(v.text)
+                          }
                           m.build()
                       }
                       transaction.buffer(ml)
@@ -351,6 +391,23 @@ object Bolt {
 
 
     def beginTransaction[T](f:Nat => T):T = {
+      val self = this
+      dbClient.readWriteTransaction()
+        .run(new TransactionCallable[T] {
+          override def run(transaction: TransactionContext): T = {
+            _transactionContext = Some(transaction)
+            val r = f(self)
+            if (_mutations.nonEmpty) {
+              transaction.buffer(_mutations)
+            }
+            _transactionContext = None
+            _mutations = List.empty[Mutation]
+            r
+          }
+        })
+    }
+
+    def beginTransaction[T](f:Nat => T,default:T):T = {
       val self = this
       dbClient.readWriteTransaction()
         .run(new TransactionCallable[T] {
