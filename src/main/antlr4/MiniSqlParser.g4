@@ -25,7 +25,7 @@ stmt returns [ ResultSet resultSet = null ]
         | update_stmt { $resultSet = $update_stmt.resultSet; }
         | delete_stmt { $resultSet = $delete_stmt.resultSet; }
         | select_stmt
-        | create_stmt { nat.executeNativeAdminQuery(admin,$create_stmt.text); }
+        | create_stmt { if ($create_stmt.isNativeQuery) nat.executeNativeAdminQuery(admin,$create_stmt.text); }
         | alter_stmt  { nat.executeNativeAdminQuery(admin,$alter_stmt.text); }
         | drop_stmt { nat.executeNativeAdminQuery(admin,$drop_stmt.text); }
         | show_stmt { $resultSet = $show_stmt.resultSet; }
@@ -179,10 +179,13 @@ delete_stmt returns [ ResultSet resultSet = null ]
           }
         ;
 
-create_stmt /* throws NativeSqlException */
-        : CREATE TABLE create_table
-        | CREATE (UNIQUE)? (NULL_FILTERED)? INDEX create_index
-        | CREATE DATABASE ID
+create_stmt returns [ Boolean isNativeQuery = true ]
+        : CREATE TABLE create_table 
+        | CREATE (UNIQUE)? (NULL_FILTERED)? INDEX
+        | CREATE DATABASE ID {
+            $isNativeQuery = false;
+            nat.createDatabase(admin,instanceId,$ID.text);
+          }
         ;
 
 use_stmt: USE ID { nat.changeDatabase($ID.text); }

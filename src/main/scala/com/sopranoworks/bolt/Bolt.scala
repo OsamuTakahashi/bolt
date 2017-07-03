@@ -368,6 +368,16 @@ object Bolt {
       }
     }
 
+    def createDatabase(admin:Admin,instanceId:String,databaseName:String):Boolean = {
+      (Option(admin),Option(instanceId)) match {
+        case (Some(admin),Some(iid)) =>
+          val r = admin.adminClient.createDatabase(iid,databaseName,List.empty[String].asJava).waitFor()
+          r.isSuccessful
+        case _ =>
+          false
+      }
+    }
+
     def showTables():ResultSet = {
       dbClient.singleUse().executeQuery(Statement.of("SELECT TABLE_NAME,PARENT_TABLE_NAME,ON_DELETE_ACTION FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA=\"\""))
     }
