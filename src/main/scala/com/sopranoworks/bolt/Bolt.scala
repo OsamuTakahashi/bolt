@@ -34,7 +34,7 @@ object Bolt {
       * Executing INSERT/UPDATE/DELETE query on Google Cloud Spanner
       * @param srcSql a INSERT/UPDATE/DELETE sql statement
       */
-    def executeQuery(srcSql:String,admin:Admin): ResultSet = srcSql.split(";").map(_.trim).filter(!_.isEmpty).map {
+    def executeQuery(srcSql:String,admin:Admin,instanceId:String): ResultSet = srcSql.split(";").map(_.trim).filter(!_.isEmpty).map {
       sql =>
         val source = new ByteArrayInputStream(sql.getBytes("UTF8"))
         val input = new ANTLRInputStream(source)
@@ -45,6 +45,7 @@ object Bolt {
         val parser = new MiniSqlParser(tokenStream)
         parser.nat = this
         parser.admin = admin
+        parser.instanceId = instanceId
 //        parser.removeErrorListeners()
 
         try {
@@ -57,7 +58,7 @@ object Bolt {
                 case Some(tr) =>
                   tr.executeQuery(Statement.of(sql))
                 case _ =>
-                  dbClient.singleUse().executeQuery(Statement.of(sql))
+                  Option(dbClient).map(_.singleUse().executeQuery(Statement.of(sql))).orNull
               }
             case _: NativeAdminSqlException =>
               Option(admin) match {
@@ -78,7 +79,7 @@ object Bolt {
         }
     }.lastOption.orNull
 
-    def executeQuery(sql:String): ResultSet = executeQuery(sql,null)
+    def executeQuery(sql:String): ResultSet = executeQuery(sql,null,null)
 
     /**
       * Internal use
@@ -109,7 +110,7 @@ object Bolt {
         case Some(_) =>
           _mutations ++= List(m.build())
         case _ =>
-          dbClient.write(List(m.build()))
+          Option(dbClient).foreach(_.write(List(m.build())))
       }
     }
 
@@ -126,7 +127,7 @@ object Bolt {
         case Some(_) =>
           _mutations ++= List(m.build())
         case _ =>
-          dbClient.write(List(m.build()))
+          Option(dbClient).foreach(_.write(List(m.build())))
       }
     }
 
@@ -149,7 +150,7 @@ object Bolt {
         case Some(_) =>
           _mutations ++= mm
         case _ =>
-          dbClient.write(mm)
+          Option(dbClient).foreach(_.write(mm))
       }
     }
 
@@ -179,7 +180,7 @@ object Bolt {
         case Some(_) =>
           _mutations ++= mm
         case _ =>
-          dbClient.write(mm)
+          Option(dbClient).foreach(_.write(mm))
       }
     }
 
@@ -239,7 +240,7 @@ object Bolt {
             case Some(_) =>
               _mutations ++= List(m.build())
             case _ =>
-              dbClient.write(List(m.build()))
+              Option(dbClient).foreach(_.write(List(m.build())))
           }
 
         case PrimaryKeyListWhere(k,v) =>
@@ -261,7 +262,7 @@ object Bolt {
             case Some(_) =>
               _mutations ++= mm
             case _ =>
-              dbClient.write(mm)
+              Option(dbClient).foreach(_.write(mm))
           }
 
         case NormalWhere(w) =>
@@ -289,7 +290,7 @@ object Bolt {
               }
 
             case _ =>
-              dbClient.readWriteTransaction()
+              Option(dbClient).foreach(_.readWriteTransaction()
                 .run(new TransactionCallable[Unit] {
                   override def run(transaction: TransactionContext):Unit = {
                     val keys = _getTargetKeys(transaction,tableName,w)
@@ -312,7 +313,7 @@ object Bolt {
                       transaction.buffer(ml)
                     }
                   }
-                })
+                }))
           }
       }
     }
@@ -328,7 +329,7 @@ object Bolt {
             case Some(_) =>
               _mutations ++= List(m)
             case _ =>
-              dbClient.write(List(m))
+              Option(dbClient).foreach(_.write(List(m)))
           }
 
         case Some(NormalWhere(w)) =>
@@ -345,7 +346,7 @@ object Bolt {
               }
 
             case _ =>
-              dbClient.readWriteTransaction()
+              Option(dbClient).foreach(_.readWriteTransaction()
                 .run(new TransactionCallable[Unit] {
                   override def run(transaction: TransactionContext):Unit = {
                     val keys = _getTargetKeys(transaction,tableName,w)
@@ -357,12 +358,12 @@ object Bolt {
                       transaction.buffer(ml)
                     }
                   }
-                })
+                }))
           }
 
         case None =>
           val m = Mutation.delete(tableName,KeySet.all())
-          dbClient.write(List(m))
+          Option(dbClient).foreach(_.write(List(m)))
         case _ =>
       }
     }
@@ -374,6 +375,22 @@ object Bolt {
     def showColumns(table:String):ResultSet =
       dbClient.singleUse().executeQuery(Statement.of(s"SELECT COLUMN_NAME,SPANNER_TYPE,IS_NULLABLE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='$table' ORDER BY ORDINAL_POSITION"))
 
+
+    def showDatabases(admin:Admin,instanceId:String):ResultSet = {
+      (Option(admin),Option(instanceId)) match {
+        case (Some(adm),Some(iid)) =>
+          val p = adm.adminClient.listDatabases(iid)
+          val dbs = p.iterateAll().map {
+            db =>
+              val b= Struct.newBuilder()
+              b.add("DATABASE_NAME",Value.string(db.getId.getDatabase)).build()
+          }
+          ResultSets.forRows(Type.struct(List(Type.StructField.of("DATABASE_NAME",Type.string()))),dbs.asJava)
+
+        case _ =>
+          null
+      }
+    }
     /**
       * Internal use
       * To resolve Antlr4's 'throws' keyword issue
@@ -388,6 +405,9 @@ object Bolt {
 
     def unknownFunction(name:String):Unit =
       throw new RuntimeException(s"Unknown function $name")
+
+    def changeDatabase(name:String):Unit =
+      throw DatabaseChangedException(name)
 
 
     def beginTransaction[T](f:Nat => T):T = {
@@ -445,7 +465,7 @@ object Bolt {
         })
     }
 
-    def sql(q:String) = executeQuery(q,null)
+    def sql(q:String) = executeQuery(q,null,null)
 
     def rollback:Unit = _transactionContext.foreach(_ => _mutations = List.empty[Mutation])
   }
@@ -514,7 +534,4 @@ object Bolt {
     case e : SpannerException =>
       Left(e)
   }
-
-//  def executeQuery(sql:String)(implicit dbClient:Nat):ResultSet =
-//    dbClient.executeQuery(sql)
 }

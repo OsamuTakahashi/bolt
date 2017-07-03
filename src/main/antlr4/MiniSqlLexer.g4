@@ -51,6 +51,9 @@ DELETE  : D E L E T E
 SHOW    : S H O W
         ;
 
+USE     : U S E
+        ;
+
 DESCRIBE: D E S C R I B E
         ;
 
@@ -172,6 +175,9 @@ NULL    : N U L L
         ;
 
 DATABASE: D A T A B A S E
+        ;
+
+DATABASES: D A T A B A S E S
         ;
 
 TABLE   : T A B L E

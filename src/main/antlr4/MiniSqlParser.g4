@@ -12,6 +12,7 @@ import org.joda.time.format.DateTimeFormat;
     Bolt.Nat nat = null;
     Admin admin = null;
     String currentTable = null;
+    String instanceId = null;
 }
 
 
@@ -28,6 +29,7 @@ stmt returns [ ResultSet resultSet = null ]
         | alter_stmt  { nat.executeNativeAdminQuery(admin,$alter_stmt.text); }
         | drop_stmt { nat.executeNativeAdminQuery(admin,$drop_stmt.text); }
         | show_stmt { $resultSet = $show_stmt.resultSet; }
+        | use_stmt
         | /* empty */
         ;
 
@@ -183,6 +185,9 @@ create_stmt /* throws NativeSqlException */
         | CREATE DATABASE ID
         ;
 
+use_stmt: USE ID { nat.changeDatabase($ID.text); }
+        ;
+
 create_table
         : ID '(' column_def (',' column_def )* ')' primary_key (',' cluster )?
         ;
@@ -251,6 +256,7 @@ show_stmt returns [ ResultSet resultSet = null ]
         : SHOW TABLES { $resultSet = nat.showTables(); }
         | SHOW (FULL)? COLUMNS (FROM|IN) ID  { $resultSet = nat.showColumns($ID.text); }
         | (DESC|DESCRIBE) ID  { $resultSet = nat.showColumns($ID.text); }
+        | SHOW DATABASES { $resultSet = nat.showDatabases(admin,instanceId); }
         ;
 
 value returns [ Value v = null ]
