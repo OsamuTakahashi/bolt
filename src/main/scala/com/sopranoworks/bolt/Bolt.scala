@@ -9,6 +9,7 @@ import org.antlr.v4.runtime._
 import org.slf4j.LoggerFactory
 import shapeless.HNil
 
+import scala.annotation.tailrec
 import scala.collection.AbstractIterator
 import scala.collection.JavaConversions._
 import scala.collection.JavaConverters._
@@ -401,6 +402,41 @@ object Bolt {
           null
       }
     }
+
+    private def _primaryKeyForTable(tableName:String):Option[String] = {
+      val key = dbClient.singleUse().executeQuery(Statement.of(s"SELECT COLUMN_NAME,COLUMN_ORDERING FROM INFORMATION_SCHEMA.INDEX_COLUMNS WHERE TABLE_NAME='$tableName' AND INDEX_NAME='PRIMARY_KEY' ORDER BY ORDINAL_POSITION")).map {
+        col =>
+          s"${col.getString(0)} ${if (col.isNull(1)) "" else col.getString(1)}"
+      }.mkString(",")
+      if (key.isEmpty) None else Some(key)
+    }
+
+    private def _deleteActionForTable(tableName:String):Option[String] = {
+      val r = dbClient.singleUse().executeQuery(Statement.of(s"SELECT PARENT_TABLE_NAME,ON_DELETE_ACTION FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA='' AND TABLE_NAME='$tableName'")).map {
+        row =>
+          s"${if (row.isNull(0)) "" else s"INTERLEAVE IN PARENT ${row.getString(0)}"} ${if (row.isNull(1)) "" else s"ON DELETE ${row.getString(1)}"}"
+      }
+      r.toList.headOption
+    }
+
+    private def _addComma(columns:List[String]):List[String] = {
+      columns.reverse match {
+        case head :: tail => (head :: tail.map(_ + ",")).reverse
+        case head :: Nil => columns
+      }
+    }
+
+    def showCreateTable(tableName:String):ResultSet = {
+      val tbl = (List(s"CREATE TABLE $tableName (") ++
+        _addComma(showColumns(tableName).map {
+          col =>
+            s"  ${col.getString("COLUMN_NAME")} ${col.getString("SPANNER_TYPE")} ${if (col.getString("IS_NULLABLE").toUpperCase.startsWith("T")) "" else "NOT NULL"}"
+        }.toList) ++
+        List(s") ${_primaryKeyForTable(tableName).map(k => s"PRIMARY KEY ($k)").getOrElse("") }", s"${ _deleteActionForTable(tableName).getOrElse(""); };") )
+          .map(s=>Struct.newBuilder().add(tableName,Value.string(s)).build())
+      ResultSets.forRows(Type.struct(List(Type.StructField.of(tableName,Type.string()))),tbl)
+    }
+
     /**
       * Internal use
       * To resolve Antlr4's 'throws' keyword issue
@@ -489,13 +525,21 @@ object Bolt {
     override def hasNext: Boolean =
       resultSet.next()
     override def next(): ResultSet =
-        resultSet
+      resultSet
   }
 
   implicit class Washer(resultSet: ResultSet) {
     def iterator = resultSetToIterator(resultSet)
     def headOption:Option[ResultSet] =
       if (resultSet.next()) Some(resultSet) else None
+  }
+
+  implicit class Sealer(resultSet: ResultSet) {
+    def autoclose[T](f: ResultSet => T):T = try {
+      f(resultSet)
+    } finally {
+      resultSet.close()
+    }
   }
 
   implicit class SafeResultSet(resultSet: ResultSet) {

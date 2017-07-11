@@ -199,7 +199,7 @@ INTERLEAVE
 PARENT  : P A R E N T
         ;
 
-CASCADE : C S C A D E
+CASCADE : C A S C A D E
         ;
 
 NO      : N O

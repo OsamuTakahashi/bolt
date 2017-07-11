@@ -178,11 +178,18 @@ object Main extends App {
                       println(e.getMessage)
 
                     case DatabaseChangedException(newDbName) =>
-                      dbName = Some(newDbName)
-                      dbClient = spanner.getDatabaseClient(DatabaseId.of(options.getProjectId, instance, newDbName))
-                      admin = Admin(spanner.getDatabaseAdminClient,instance,newDbName)
-                      displayName = newDbName
-                      Option(dbClient).foreach(Database.startWith)
+                      try {
+                        val cln = spanner.getDatabaseClient(DatabaseId.of(options.getProjectId, instance, newDbName))
+                        Option(cln).foreach(Database.startWith)
+
+                        dbClient = cln
+                        admin = Admin(spanner.getDatabaseAdminClient, instance, newDbName)
+                        dbName = Some(newDbName)
+                        displayName = newDbName
+                      } catch {
+                        case e: SpannerException =>
+                          println(e.getMessage)
+                      }
 
                     case e: RuntimeException =>
                       println(e.getMessage)

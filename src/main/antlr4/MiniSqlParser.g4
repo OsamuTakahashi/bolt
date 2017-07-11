@@ -260,6 +260,7 @@ show_stmt returns [ ResultSet resultSet = null ]
         | SHOW (FULL)? COLUMNS (FROM|IN) ID  { $resultSet = nat.showColumns($ID.text); }
         | (DESC|DESCRIBE) ID  { $resultSet = nat.showColumns($ID.text); }
         | SHOW DATABASES { $resultSet = nat.showDatabases(admin,instanceId); }
+        | SHOW CREATE TABLE ID { $resultSet = nat.showCreateTable($ID.text); }
         ;
 
 value returns [ Value v = null ]
