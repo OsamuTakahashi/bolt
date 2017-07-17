@@ -23,7 +23,7 @@ class DatabaseTest extends Specification with BeforeAfterEach {
   }
 
   override protected def after: Any = {
-    _options.foreach(_.getService.closeAsync().get())
+    _options.foreach(_.getService.close())
   }
 
 //  "database and tables" should {

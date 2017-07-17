@@ -8,7 +8,10 @@ resolvers in Global += "RustyRaven" at "http://rustyraven.github.io"
 
 resolvers in Global += "scalaz-bintray" at "http://dl.bintray.com/scalaz/releases"
 
-val codebookLibrary = Seq("com.rustyraven" %% "codebook-runtime" % "1.3-SNAPSHOT")
+val codebookLibrary = Seq("com.rustyraven" %% "codebook-runtime" % "1.3.1-SNAPSHOT" excludeAll(
+  ExclusionRule(organization = "com.typesafe.akka"),
+  ExclusionRule(organization = "net.liftweb")
+))
 
 val spannerClientLibraries = Seq(
   "com.google.cloud" % "google-cloud-spanner" % "0.19.0-beta",
@@ -43,7 +46,7 @@ parallelExecution in ThisBuild := false
 
 fork in run := true
 
-val projectVersion = "0.8.4-SNAPSHOT"
+val projectVersion = "0.9-SNAPSHOT"
 
 val noJavaDoc = Seq(
   publishArtifact in (Compile, packageDoc) := false,
@@ -65,7 +68,7 @@ lazy val core = (project in file("."))
     libraryDependencies ++=
       spannerClientLibraries ++
       codebookLibrary ++
-      shapelessLibrary ++
+//      shapelessLibrary ++
       loggingLibraries ++
       testLibraries ++
       commonLibraries,

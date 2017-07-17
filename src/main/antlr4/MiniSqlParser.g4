@@ -13,6 +13,7 @@ import org.joda.time.format.DateTimeFormat;
     Admin admin = null;
     String currentTable = null;
     String instanceId = null;
+
 }
 
 
@@ -24,7 +25,7 @@ stmt returns [ ResultSet resultSet = null ]
         : insert_stmt { $resultSet = $insert_stmt.resultSet; }
         | update_stmt { $resultSet = $update_stmt.resultSet; }
         | delete_stmt { $resultSet = $delete_stmt.resultSet; }
-        | select_stmt
+        | query_stmt { $resultSet = nat.executeNativeQuery($query_stmt.text); }
         | create_stmt { if ($create_stmt.isNativeQuery) nat.executeNativeAdminQuery(admin,$create_stmt.text); }
         | alter_stmt  { nat.executeNativeAdminQuery(admin,$alter_stmt.text); }
         | drop_stmt { nat.executeNativeAdminQuery(admin,$drop_stmt.text); }
@@ -33,29 +34,42 @@ stmt returns [ ResultSet resultSet = null ]
         | /* empty */
         ;
 
-//query_stmt
-//        : table_hint_expr? join_hint_expr? query_expr
-//        ;
-//
-//query_expr
-//        :  ( select_stmt | '(' query_expr ')' | query_expr set_op query_expr )(ORDER BY expression (ASC|DESC)? (',' expression (ASC|DESC)? )* )? ( LIMIT count ( OFFSET skip_rows )? )?
-//        ;
+query_stmt
+        : table_hint_expr? join_hint_expr? query_expr
+        ;
 
+query_expr
+        :  ( query_expr_elem | query_expr_elem set_op query_expr )(ORDER BY expression (ASC|DESC)? (',' expression (ASC|DESC)? )* )? ( LIMIT count ( OFFSET skip_rows )? )?
+        ;
+
+
+query_expr_elem
+        : select_stmt
+        | '(' query_expr ')'
+        ;
 
 select_stmt /* throws NativeSqlException */
-        : SELECT { /*throw new NativeSqlException()*/nat.useNative(); } (ALL|DISTINCT)? ('*' | expression ( AS? alias )? ) ( FROM from_item )? ( WHERE bool_expression )? ( GROUP BY expression (',' expression)* )? ( HAVING bool_expression )?
+        : SELECT /*{ nat.useNative(); }*/ (ALL|DISTINCT)?  (AS STRUCT)? (MUL | expression ( AS? alias )? (',' expression ( AS? alias )? )* )
+            ( FROM from_item_with_joind (',' from_item_with_joind)* )?
+            ( WHERE bool_expression )?
+            ( GROUP BY expression (',' expression)* )?
+            ( HAVING bool_expression )?
         ;
 
 set_op  : UNION (ALL|DISTINCT)
         ;
 
+from_item_with_joind
+        : from_item join*
+//        | join
+        ;
 
 from_item
-        : table_name (table_hint_expr (AS? alias)? )?
-        /*| join
-         | '(' query_expr ')' table_hint_expr? (AS? alias)?
-        | field_path
-        | ( UNNEST '(' array_expr ')' | UNNEST '(' array_path ')' | array_path ) table_hint_expr? (AS? alias) (WITH OFFSET (AS? alias)? )? */
+        : table_name (table_hint_expr )? (AS? alias)?
+        | '(' query_expr ')' table_hint_expr? (AS? alias)?
+        | field_path (AS? alias)?
+        | ( UNNEST '(' array_expression? ')' | UNNEST '(' array_path ')' | array_path ) table_hint_expr? (AS? alias)? (WITH OFFSET (AS? alias)? )?
+        | '(' from_item_with_joind ')'
         ;
 
 table_hint_expr
@@ -76,7 +90,9 @@ skip_rows
         : NUMBER
         ;
 
-
+field_path
+        : ID (DOT ID)+
+        ;
 
 table_hint_key
         : FORCE_INDEX
@@ -88,16 +104,44 @@ table_hint_value
         ;
 
 expression
-        : column_name
+        : ID
+        | field_path
+        | scalar_value
+        | struct_value
+        | array_expression
+        | cast_expression
+        | expression bin_op expression
+        | '(' expression ')'
+        | '(' query_expr ')'
+        ;
+
+array_path
+        :  ID '['  (expression| OFFSET '(' expression ')' | ORDINAL '(' expression ')') ']'
+        | field_path
         ;
 
 bool_expression
         : expression bool_op expression
+        | bool_expression rel bool_expression
+        | expression IS NOT? (TRUE | FALSE | NULL)
+        | expression BETWEEN expression AND expression
+        | expression NOT? LIKE expression
+        | expression NOT? IN ( array_expression | '(' query_expr ')' | UNNEST '(' array_expression ')' )
+        | bool_value
+        | function
         ;
 
+array_expression
+        : (ARRAY '<' scalar_type '>')? '[' (expression (',' expression)* )? ']'
+        | ARRAY '(' query_stmt ')'
+        | ID
+        ;
+
+cast_expression
+        : CAST '(' expression AS type ')'
+        ;
 
 bool_op : cond
-        | rel
         ;
 
 column_name
@@ -106,7 +150,7 @@ column_name
         ;
 
 
-join    : from_item join_type? join_method JOIN join_hint_expr? from_item ( ON bool_expression | USING '(' join_column (',' join_column)* ')' )?
+join    : /*from_item */join_type? join_method? JOIN join_hint_expr? from_item ( ON bool_expression | USING '(' join_column (',' join_column)* ')' )?
         ;
 
 join_type
@@ -209,6 +253,10 @@ key_part: ID (ASC | DESC)?
 cluster : INTERLEAVE IN PARENT ID ( ON DELETE ( CASCADE | NO ACTION ) )?
         ;
 
+type    : scalar_type
+        | array_type
+        ;
+
 scalar_type
         : BOOL
         | INT64
@@ -256,44 +304,63 @@ drop_stmt /* throws NativeSqlException */
         ;
 
 show_stmt returns [ ResultSet resultSet = null ]
-        : SHOW TABLES { $resultSet = nat.showTables(); }
-        | SHOW (FULL)? COLUMNS (FROM|IN) ID  { $resultSet = nat.showColumns($ID.text); }
+        : SHOW ID {
+            if ($ID.text.equalsIgnoreCase("TABLES")) {
+              $resultSet = nat.showTables();
+            } else
+            if ($ID.text.equalsIgnoreCase("DATABASES")) {
+              $resultSet = nat.showDatabases(admin,instanceId);
+            } else {
+              // exception
+            }
+          }
+        | SHOW (FULL)? ID { if (!$ID.text.equalsIgnoreCase("COLUMNS")) throw new RuntimeException("Unknown token:" + $ID.text); } (FROM|IN) ID  { $resultSet = nat.showColumns($ID.text); }
         | (DESC|DESCRIBE) ID  { $resultSet = nat.showColumns($ID.text); }
-        | SHOW DATABASES { $resultSet = nat.showDatabases(admin,instanceId); }
         | SHOW CREATE TABLE ID { $resultSet = nat.showCreateTable($ID.text); }
         ;
 
 value returns [ Value v = null ]
         : scalar_value { $v = $scalar_value.v; }
         | array_value { $v = $array_value.v; }
+        | struct_value
         | /* empty */ { $v = NullValue$.MODULE$; }
         ;
 
 array_value returns [ Value v = null ]
         locals [ List<String> vlist = new ArrayList<String>(); ]
-        : '(' (scalar_value { $vlist.add($scalar_value.v.text()); } (',' scalar_value { $vlist.add($scalar_value.v.text()); })* )? ')' {
+        : (ARRAY '<' scalar_type '>') '[' (scalar_value { $vlist.add($scalar_value.v.text()); } (',' scalar_value { $vlist.add($scalar_value.v.text()); })* )? ']' {
             $v = new ArrayValue($vlist);
           }
+        | ARRAY '(' query_stmt ')'
+        | ID
         ;
 
 scalar_value  returns [ Value v = null ]
         : STRING { $v = new StringValue($STRING.text.substring(1,$STRING.text.length() - 1)); }
         | NUMBER { $v = new IntValue($NUMBER.text); }
-        | TRUE { $v = new IntValue($TRUE.text); }
-        | FALSE { $v = new IntValue($FALSE.text); }
+        | bool_value { $v = $bool_value.v; }
         | NULL { $v = NullValue$.MODULE$; }
         | function { $v = $function.v; }
+        | array_path
         ;
 
 
+bool_value  returns [ Value v = null ]
+        : TRUE { $v = new IntValue($TRUE.text); }
+        | FALSE { $v = new IntValue($FALSE.text); }
+        ;
+
+struct_value
+        : STRUCT '(' expression (AS? ID)? (',' expression (AS? ID)?)* ')'
+        ;
 
 function returns [ Value v = null ]
-        : ID '(' ')' {
+        : ID '(' (MUL | expression (',' expression)* )? ')' {
             if ($ID.text.toUpperCase().equals("NOW")) {
               Timestamp ts = Timestamp.now();
               $v = new StringValue(ts.toString());
             } else {
-              nat.unknownFunction($ID.text);
+//              nat.unknownFunction($ID.text);
             }
           }
         ;
@@ -302,28 +369,28 @@ where_stmt returns [ Where where = null ] locals [ List<WhereCondition> conds = 
         : WHERE ID EQ value {
             if (nat.isKey(currentTable,$ID.text)) {
               $where = new PrimaryKeyWhere($ID.text,$value.v.text());
-            } else {
+            } /*else {
               StringBuilder stmt = new StringBuilder();
               stmt.append("WHERE ");
               stmt.append($ID.text);
               stmt.append("=");
               stmt.append($value.v.qtext());
               $where = new NormalWhere(new String(stmt));
-            }
+            } */
           }
         | WHERE ID IN values {
             if (nat.isKey(currentTable,$ID.text)) {
               $where = new PrimaryKeyListWhere($ID.text,$values.valueList);
-            } else {
+            } /* else {
               StringBuilder stmt = new StringBuilder();
               stmt.append("WHERE ");
               stmt.append($ID.text);
               stmt.append(" IN ");
               stmt.append($values.text);
               $where = new NormalWhere(new String(stmt));
-            }
+            } */
           }
-        | WHERE ID cond value { $conds.add(new WhereCondition(null,$ID.text,$cond.text,$value.v.qtext())); } ( rel ID cond value { $conds.add(new WhereCondition($rel.text,$ID.text,$cond.text,$value.v.qtext())); } )* {
+/*        | WHERE ID cond value { $conds.add(new WhereCondition(null,$ID.text,$cond.text,$value.v.qtext())); } ( rel ID cond value { $conds.add(new WhereCondition($rel.text,$ID.text,$cond.text,$value.v.qtext())); } )* {
             StringBuilder stmt = new StringBuilder();
             stmt.append("WHERE ");
 
@@ -338,11 +405,24 @@ where_stmt returns [ Where where = null ] locals [ List<WhereCondition> conds = 
               stmt.append(" ");
             }
             $where = new NormalWhere(new String(stmt));
+          } */
+        | WHERE bool_expression {
           }
         ;
 
 values returns [ List<Value> valueList = new ArrayList<Value>() ]
         :  '(' value { $valueList.add($value.v); } ( ',' value { $valueList.add($value.v); } )* ')'
+        ;
+
+bin_op  : PLUS
+        | MINUS
+        | MUL
+        | DIV
+        | BIT_SL
+        | BIT_SR
+        | BIT_AND
+        | BIT_OR
+        | BIT_XOR
         ;
 
 rel returns [ String text = null ]
@@ -358,6 +438,6 @@ cond returns [ String text = null ]
         | LT { $text = $LT.text; }
         | GEQ { $text = $GEQ.text; }
         | LEQ { $text = $LEQ.text; }
-        | LIKE { $text = $LIKE.text; }
-        | NOT LIKE { $text = "NOT LIKE"; }
+/*        | LIKE { $text = $LIKE.text; }
+        | NOT LIKE { $text = "NOT LIKE"; } */
         ;

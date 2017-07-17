@@ -22,7 +22,7 @@ class ResultSetToIteratorTest extends Specification with BeforeAfterEach {
 
   def spannerOptions(config:Config) = {
     val options = SpannerOptions.newBuilder()
-    options.setProjectId()
+//    options.setProjectId()
 
     config.getStringOpt("spanner.client_secret").foreach {
       json =>
@@ -47,7 +47,7 @@ class ResultSetToIteratorTest extends Specification with BeforeAfterEach {
   }
 
   override protected def after: Any = {
-    _options.foreach(_.getService.closeAsync().get())
+    _options.foreach(_.getService.close())
   }
 
   "Iteration test" should {

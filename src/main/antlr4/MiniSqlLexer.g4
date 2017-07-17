@@ -27,6 +27,9 @@ fragment X:('x'|'X');
 fragment Y:('y'|'Y');
 fragment Z:('z'|'Z');
 
+CAST    : C A S T
+        ;
+
 CREATE  : C R E A T E
         ;
 
@@ -78,7 +81,10 @@ ADD     : A D D
 OFFSET  : O F F S E T
         ;
 
-HAVING  : H V I N G
+ORDINAL : O R D I N A L
+        ;
+
+HAVING  : H A V I N G
         ;
 
 ORDER   : O R D E R
@@ -114,9 +120,6 @@ INDEX   : I N D E X
 FULL    : F U L L
         ;
 
-COLUMNS : C O L U M N S
-        ;
-
 COLUMN  : C O L U M N
         ;
 
@@ -141,6 +144,9 @@ CROSS   : C R O S S
 HASH   : H A S H
         ;
 
+UNNEST  : U N N E S T
+        ;
+
 OR      : O R
         | '||'
         ;
@@ -156,7 +162,16 @@ NOT     : N O T
 XOR     : X O R
         ;
 
+IS      : I S
+        ;
+
 LIKE    : L I K E
+        ;
+
+BETWEEN : B E T W E E N
+        ;
+
+WITH    : W I T H
         ;
 
 IN      : I N
@@ -177,13 +192,7 @@ NULL    : N U L L
 DATABASE: D A T A B A S E
         ;
 
-DATABASES: D A T A B A S E S
-        ;
-
 TABLE   : T A B L E
-        ;
-
-TABLES  : T A B L E S
         ;
 
 PRIMARY : P R I M A R Y
@@ -262,13 +271,44 @@ TIMESTAMP
 ARRAY   : A R R A Y
         ;
 
+STRUCT  : S T R U C T
+        ;
+
 MAX     : M A X
+        ;
+
+PLUS    : '+'
+        ;
+
+MINUS   : '-'
+        ;
+
+MUL     : '*'
+        ;
+
+DIV     : '/'
         ;
 
 EQ      : '='
         ;
 
+BIT_SL  : '<<'
+        ;
+
+BIT_SR  : '>>'
+        ;
+
+BIT_AND : '&'
+        ;
+
+BIT_OR  : '|'
+        ;
+
+BIT_XOR : '^'
+        ;
+
 NEQ     : '<>'
+        | '!='
         ;
 
 LEQ     : '<='
@@ -316,14 +356,27 @@ BRB     : '{'
 BRE     : '}'
         ;
 
+BRACE_B : '['
+        ;
+
+BRACE_E : ']'
+        ;
+
 ID      : [a-zA-Z_][a-zA-Z0-9_]*
         ;
 
-NUMBER  : ('+'|'-')? [0-9]+  (F | D)?
-        | ('+'|'-')? [0-9]* '.' [0-9]* (E ('+' | '-')? [0-9]+)? (F | D)?
+//NUMBER  : ('+'|'-')? [0-9]+  (F | D)?
+//        | ('+'|'-')? [0-9]* '.' [0-9]* (E ('+' | '-')? [0-9]+)? (F | D)?
+//        ;
+
+NUMBER  : ('+'|'-')? [0-9]+ ('.' [0-9]+)?(E ('+'|'-')? [0-9]+)?
+        | [0-9]* '.' [0-9]+ (E ('+'|'-')? [0-9]+)?
+        | [0-9]+ E ('+'|'-')? [0-9]+
         ;
 
+
 STRING  : '\'' ~[\']* '\''
+        | '"' ~["]* '"'
         ;
 
 WS      : [ \t]+ -> channel(HIDDEN)

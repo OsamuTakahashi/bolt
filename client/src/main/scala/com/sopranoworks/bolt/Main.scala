@@ -75,17 +75,17 @@ object Main extends App {
                   case v if v == Type.date() =>
                     r.getDate(i).toString
                   case v if v == Type.array(Type.bool()) =>
-                    s"(${r.getBooleanArray(i).mkString(",")})"
+                    s"[${r.getBooleanArray(i).mkString(",")}]"
                   case v if v == Type.array(Type.int64()) =>
-                    s"(${r.getLongArray(i).mkString(",")})"
+                    s"[${r.getLongArray(i).mkString(",")}]"
                   case v if v == Type.array(Type.float64()) =>
-                    s"(${r.getDoubleArray(i).mkString(",")})"
+                    s"[${r.getDoubleArray(i).mkString(",")}]"
                   case v if v == Type.array(Type.string()) =>
-                    s"(${r.getStringList(i).asScala.mkString(",")})"
+                    s"[${r.getStringList(i).asScala.mkString(",")}]"
                   case v if v == Type.array(Type.timestamp()) =>
-                    s"(${r.getTimestampList(i).asScala.mkString(",")})"
+                    s"[${r.getTimestampList(i).asScala.mkString(",")}]"
                   case v if v == Type.array(Type.date()) =>
-                    s"(${r.getDateList(i).asScala.mkString(",")})"
+                    s"[${r.getDateList(i).asScala.mkString(",")}]"
                   case t =>
                     s"Unknown($t)"
                 }

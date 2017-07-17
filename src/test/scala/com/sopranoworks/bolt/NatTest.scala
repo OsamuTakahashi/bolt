@@ -29,7 +29,7 @@ class NatTest extends Specification with BeforeAfterEach {
   }
 
   override protected def after: Any = {
-    _options.foreach(_.getService.closeAsync().get())
+    _options.foreach(_.getService.close())
   }
 
   case class Item(trId:Long,userId:Long,itemId:Long,count:Int)

@@ -6,6 +6,7 @@ import com.google.cloud.Date
 import com.google.cloud.spanner.TransactionRunner.TransactionCallable
 import com.google.cloud.spanner._
 import org.antlr.v4.runtime._
+import org.antlr.v4.runtime.misc.ParseCancellationException
 import org.slf4j.LoggerFactory
 import shapeless.HNil
 
@@ -71,6 +72,7 @@ object Bolt {
                   _logger.warn("Could not execute administrator query")
               }
               null
+//            case _ : ParseCancellationException =>
           }
         } catch {
           case e : Exception =>
@@ -184,6 +186,9 @@ object Bolt {
           Option(dbClient).foreach(_.write(mm))
       }
     }
+
+    def executeNativeQuery(sql:String):ResultSet =
+      dbClient.singleUse().executeQuery(Statement.of(sql))
 
     def executeNativeAdminQuery(admin:Admin,sql:String):Unit = {
       Option(admin) match {
