@@ -4,7 +4,7 @@ import java.io.{BufferedReader, File, FileInputStream, InputStreamReader}
 
 import com.google.auth.oauth2.GoogleCredentials
 import com.google.cloud.spanner._
-import com.typesafe.config.{Config, ConfigFactory}
+//import com.typesafe.config.{Config, ConfigFactory}
 
 import scala.io.StdIn
 import scala.collection.JavaConverters._
@@ -14,7 +14,7 @@ import scala.collection.JavaConverters._
   */
 object Main extends App {
   import Bolt._
-  import codebook.runtime.util.SafeConfig._
+//  import codebook.runtime.util.SafeConfig._
   
 //  val config = ConfigFactory.load()
 

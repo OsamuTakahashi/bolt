@@ -2,6 +2,7 @@ parser grammar MiniSqlParser;
 options { tokenVocab=MiniSqlLexer; }
 
 @header {
+import java.util.ArrayDeque;
 import com.google.cloud.spanner.ResultSet;
 import com.google.cloud.Timestamp;
 import org.joda.time.DateTime;
@@ -13,7 +14,19 @@ import org.joda.time.format.DateTimeFormat;
     Admin admin = null;
     String currentTable = null;
     String instanceId = null;
+    int _subqueryDepth = 0;
 
+    private Boolean insideSelect() {
+        return _subqueryDepth > 0;
+    }
+
+    private void enterSelect() {
+        _subqueryDepth += 1;
+    }
+
+    private void exitSelect() {
+        _subqueryDepth -= 1;
+    }
 }
 
 
@@ -49,11 +62,11 @@ query_expr_elem
         ;
 
 select_stmt /* throws NativeSqlException */
-        : SELECT /*{ nat.useNative(); }*/ (ALL|DISTINCT)?  (AS STRUCT)? (MUL | expression ( AS? alias )? (',' expression ( AS? alias )? )* )
+        : SELECT { enterSelect(); } /*{ nat.useNative(); }*/ (ALL|DISTINCT)?  (AS STRUCT)? (MUL | expression ( AS? alias )? (',' expression ( AS? alias )? )* )
             ( FROM from_item_with_joind (',' from_item_with_joind)* )?
             ( WHERE bool_expression )?
             ( GROUP BY expression (',' expression)* )?
-            ( HAVING bool_expression )?
+            ( HAVING bool_expression )? { exitSelect(); }
         ;
 
 set_op  : UNION (ALL|DISTINCT)
@@ -103,16 +116,20 @@ table_hint_value
         : ID
         ;
 
-expression
+expression returns [ Value v = null ]
         : ID
         | field_path
-        | scalar_value
-        | struct_value
+        | scalar_value { $v = $scalar_value.v; }
+        | struct_value { $v = $struct_value.v; }
         | array_expression
         | cast_expression
         | expression bin_op expression
-        | '(' expression ')'
-        | '(' query_expr ')'
+        | '(' expression ')' { $v = $expression.v; }
+        | '(' query_expr ')' {
+            if (!insideSelect()) {
+              $v = new SubqueryValue(nat,$query_expr.text);
+            }
+          }
         ;
 
 array_path
@@ -203,17 +220,19 @@ update_stmt
             locals [
               List<KeyValue> kvs = new ArrayList<KeyValue>()
             ]
-        : UPDATE ID { currentTable = $ID.text; } SET ID EQ value { $kvs.add(new KeyValue($ID.text,$value.v)); } ( ',' ID EQ value { $kvs.add(new KeyValue($ID.text,$value.v)); } )* where_stmt ( LIMIT ln=NUMBER )? {
-            if ($where_stmt.where.onlyPrimaryKey()) {
-              nat.update(currentTable,$kvs,$where_stmt.where);
-            } else {
-              NormalWhere w = (NormalWhere)$where_stmt.where;
-              if ($ln != null) {
-                w = new NormalWhere(w.whereStmt() + " LIMIT " + $ln.text);
+        : UPDATE ID { currentTable = $ID.text; }
+            SET ID EQ expression { $kvs.add(new KeyValue($ID.text,$expression.v)); } ( ',' ID EQ expression { $kvs.add(new KeyValue($ID.text,$expression.v)); } )*
+            where_stmt ( LIMIT ln=NUMBER )? {
+              if ($where_stmt.where != null && $where_stmt.where.onlyPrimaryKey()) {
+                nat.update(currentTable,$kvs,$where_stmt.where);
+              } else {
+                NormalWhere w = new NormalWhere($where_stmt.text);
+                if ($ln != null) {
+                  w = new NormalWhere(w.whereStmt() + " LIMIT " + $ln.text);
+                }
+                nat.update(currentTable,$kvs,w);
               }
-              nat.update(currentTable,$kvs,w);
             }
-          }
         ;
 
 delete_stmt returns [ ResultSet resultSet = null ]
@@ -312,6 +331,7 @@ show_stmt returns [ ResultSet resultSet = null ]
               $resultSet = nat.showDatabases(admin,instanceId);
             } else {
               // exception
+              throw new RuntimeException("Unknown token:" + $ID.text);
             }
           }
         | SHOW (FULL)? ID { if (!$ID.text.equalsIgnoreCase("COLUMNS")) throw new RuntimeException("Unknown token:" + $ID.text); } (FROM|IN) ID  { $resultSet = nat.showColumns($ID.text); }
@@ -350,8 +370,8 @@ bool_value  returns [ Value v = null ]
         | FALSE { $v = new IntValue($FALSE.text); }
         ;
 
-struct_value
-        : STRUCT '(' expression (AS? ID)? (',' expression (AS? ID)?)* ')'
+struct_value returns [ StructValue v = null; ]
+        : STRUCT /*{ if (!insideSelect()) $v = new StructValue(); }*/ '(' expression (AS? ID)? { if (!insideSelect()) $v.addValue($expression.v); } (',' expression (AS? ID)? { if (!insideSelect()) $v.addValue($expression.v); })* ')'
         ;
 
 function returns [ Value v = null ]
@@ -367,51 +387,20 @@ function returns [ Value v = null ]
 
 where_stmt returns [ Where where = null ] locals [ List<WhereCondition> conds = new ArrayList<WhereCondition>() ]
         : WHERE ID EQ value {
-            if (nat.isKey(currentTable,$ID.text)) {
+            if (!insideSelect() && nat.isKey(currentTable,$ID.text)) {
               $where = new PrimaryKeyWhere($ID.text,$value.v.text());
-            } /*else {
-              StringBuilder stmt = new StringBuilder();
-              stmt.append("WHERE ");
-              stmt.append($ID.text);
-              stmt.append("=");
-              stmt.append($value.v.qtext());
-              $where = new NormalWhere(new String(stmt));
-            } */
+            }
           }
         | WHERE ID IN values {
-            if (nat.isKey(currentTable,$ID.text)) {
+            if (!insideSelect() && nat.isKey(currentTable,$ID.text)) {
               $where = new PrimaryKeyListWhere($ID.text,$values.valueList);
-            } /* else {
-              StringBuilder stmt = new StringBuilder();
-              stmt.append("WHERE ");
-              stmt.append($ID.text);
-              stmt.append(" IN ");
-              stmt.append($values.text);
-              $where = new NormalWhere(new String(stmt));
-            } */
-          }
-/*        | WHERE ID cond value { $conds.add(new WhereCondition(null,$ID.text,$cond.text,$value.v.qtext())); } ( rel ID cond value { $conds.add(new WhereCondition($rel.text,$ID.text,$cond.text,$value.v.qtext())); } )* {
-            StringBuilder stmt = new StringBuilder();
-            stmt.append("WHERE ");
-
-            for (WhereCondition wc : $conds) {
-              if (wc.rel() != null) {
-                stmt.append(wc.rel());
-                stmt.append(" ");
-              }
-              stmt.append(wc.column());
-              stmt.append(wc.cond());
-              stmt.append(wc.value());
-              stmt.append(" ");
             }
-            $where = new NormalWhere(new String(stmt));
-          } */
-        | WHERE bool_expression {
           }
+        | WHERE bool_expression
         ;
 
 values returns [ List<Value> valueList = new ArrayList<Value>() ]
-        :  '(' value { $valueList.add($value.v); } ( ',' value { $valueList.add($value.v); } )* ')'
+        :  '(' expression { $valueList.add($expression.v); } ( ',' expression { $valueList.add($expression.v); } )* ')'
         ;
 
 bin_op  : PLUS
