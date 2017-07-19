@@ -107,3 +107,35 @@ lazy val client = (project in file("client"))
     libraryDependencies ++= scoptLibrary ++ jlineLibrary
   ).dependsOn(core)
   .settings(noJavaDoc: _*)
+
+lazy val dump = (project in file("dump"))
+  .enablePlugins(JavaAppPackaging,UniversalPlugin)
+  .settings(
+    scalaVersion := projectScalaVersion,
+    name := "spanner-dump",
+    version := projectVersion,
+    assemblyJarName := "spanner-dump.jar",
+    scriptClasspath := Seq( assemblyJarName.value ),
+    mappings in Universal := {
+        val universalMappings = (mappings in Universal).value
+        val fatJar = (assembly in Compile).value
+        val filtered = universalMappings filter {
+            case (file, name) =>  ! name.endsWith(".jar")
+        }
+        filtered :+ (fatJar -> ("lib/" + fatJar.getName))
+    },
+    assemblyMergeStrategy in assembly := {
+      case "META-INF/io.netty.versions.properties" => MergeStrategy.concat
+      case "project.properties" => MergeStrategy.first
+      case "META-INF/native/linux32/libjansi.so" => MergeStrategy.last
+      case "META-INF/native/linux64/libjansi.so" => MergeStrategy.last
+      case "META-INF/native/osx/libjansi.jnilib" => MergeStrategy.last
+      case "META-INF/native/windows32/jansi.dll" => MergeStrategy.last
+      case "META-INF/native/windows64/jansi.dll" => MergeStrategy.last
+      case x =>
+        val oldStrategy = (assemblyMergeStrategy in assembly).value
+        oldStrategy(x)
+    },
+    libraryDependencies ++= scoptLibrary ++ jlineLibrary
+  ).dependsOn(core)
+  .settings(noJavaDoc: _*)
