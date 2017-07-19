@@ -118,6 +118,7 @@ table_hint_value
 
 expression returns [ Value v = null ]
         : bit_or_expr { $v = $bit_or_expr.v; }
+        | bool_expression { $v = $bool_expression.v; }
         ;
 
 
@@ -177,15 +178,15 @@ array_path
         ;
 
 bool_expression returns [ Value v = null ]
-        : a1=expression bool_op b1=expression { $v = new BooleanExpressionValue($bool_op.text,$a1.v,$b1.v); }
+        : a1=bit_or_expr bool_op b1=bit_or_expr { $v = new BooleanExpressionValue($bool_op.text,$a1.v,$b1.v); }
         | a2=bool_expression rel b2=bool_expression { $v = new BooleanExpressionValue($rel.text,$a2.v,$b2.v); }
         | bool_expression IS n1=NOT? bool_or_null_value {
             String op = $n1 != null ? "!=" : "=";
             $v = new BooleanExpressionValue(op,$bool_expression.v,$bool_or_null_value.v);
           }
-        | expression BETWEEN expression AND expression
-        | expression NOT? LIKE expression
-        | expression NOT? IN ( array_expression | '(' query_expr ')' | UNNEST '(' array_expression ')' )
+        | bit_or_expr BETWEEN bit_or_expr AND bit_or_expr
+        | bit_or_expr NOT? LIKE bit_or_expr
+        | bit_or_expr NOT? IN ( array_expression | '(' query_expr ')' | UNNEST '(' array_expression ')' )
         | bool_value { $v = $bool_value.v; }
         | function
         ;
@@ -279,7 +280,7 @@ update_stmt
 
 delete_stmt returns [ ResultSet resultSet = null ]
             locals [ Where where = null ]
-        : DELETE FROM ID { currentTable = $ID.text; } (where_stmt { $where = $where_stmt.where; })? {
+        : DELETE FROM ID { currentTable = $ID.text; } (where_stmt { $where = ($where_stmt.where == null) ? new NormalWhere($where_stmt.text) : $where_stmt.where; })? {
             nat.delete(currentTable,$where);
           }
         ;
