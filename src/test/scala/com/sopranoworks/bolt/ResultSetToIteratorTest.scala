@@ -52,8 +52,8 @@ class ResultSetToIteratorTest extends Specification with BeforeAfterEach {
 
   "Iteration test" should {
     "map" in {
-      _dbClient.get.sql("INSERT INTO test_tbl01 (id,name) VALUES(103,'test insert');")
-      val resSet = _dbClient.get.sql("SELECT * FROM test_tbl01 WHERE id=103")
+      _dbClient.get.executeQuery("INSERT INTO test_tbl01 (id,name) VALUES(103,'test insert');")
+      val resSet = _dbClient.get.executeQuery("SELECT * FROM test_tbl01 WHERE id=103")
       resSet.map(r=>r.getString("name")).toList must_== List("test insert")
 //      println("begin")
 //      Thread.sleep(300000)

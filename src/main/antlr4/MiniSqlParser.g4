@@ -96,11 +96,11 @@ table_name
 alias   : ID
         ;
 
-count   : NUMBER
+count   : INT_VAL
         ;
 
 skip_rows
-        : NUMBER
+        : INT_VAL
         ;
 
 field_path
@@ -117,18 +117,57 @@ table_hint_value
         ;
 
 expression returns [ Value v = null ]
+        : bit_or_expr { $v = $bit_or_expr.v; }
+        ;
+
+
+bit_or_expr returns [ Value v = null ]
+            locals [ Value tv = null ]
+        : bit_xor_expr { $tv = $bit_xor_expr.v; } (BIT_OR bit_xor_expr { $tv = new ExpressionValue($BIT_OR.text,$tv,$bit_xor_expr.v); })* { $v = $tv; }
+        ;
+
+bit_xor_expr returns [ Value v = null ]
+            locals [ Value tv = null ]
+        : bit_and_expr { $tv = $bit_and_expr.v; } (BIT_XOR bit_and_expr { $tv = new ExpressionValue($BIT_XOR.text,$tv,$bit_and_expr.v); } )* { $v = $tv; }
+        ;
+
+bit_and_expr returns [ Value v = null ]
+            locals [ Value tv = null ]
+        : shift_expr { $tv = $shift_expr.v; } (BIT_AND shift_expr { $tv = new ExpressionValue($BIT_AND.text,$tv,$shift_expr.v); } )* { $v = $tv; }
+        ;
+
+shift_expr returns [ Value v = null ]
+            locals [ Value tv = null ]
+        : plus_expr { $tv = $plus_expr.v; } (op=(BIT_SL|BIT_SR) plus_expr { $tv = new ExpressionValue($op.text,$tv,$plus_expr.v); } )* { $v = $tv; }
+        ;
+
+plus_expr returns [ Value v = null ]
+            locals [ Value tv = null ]
+        : mul_expr { $tv = $mul_expr.v; } (op=(PLUS|MINUS) mul_expr { $tv = new ExpressionValue($op.text,$tv,$mul_expr.v); } )* { $v = $tv; }
+        ;
+
+
+mul_expr returns [ Value v = null ]
+            locals [ Value tv = null ]
+        : unary_expr { $tv = $unary_expr.v; } (op=(MUL|DIV) unary_expr { $tv = new ExpressionValue($op.text,$tv,$unary_expr.v); })* { $v = $tv; }
+        ;
+
+unary_expr returns [ Value v = null ]
+        : op=(MINUS|PLUS|BIT_NOT)? atom { if ($op != null) $v = new ExpressionValue($op.text, $atom.v, null); else $v = $atom.v; }
+        ;
+
+atom returns [ Value v = null ]
         : ID
         | field_path
         | scalar_value { $v = $scalar_value.v; }
         | struct_value { $v = $struct_value.v; }
         | array_expression
         | cast_expression
-        | expression bin_op expression
         | '(' expression ')' { $v = $expression.v; }
         | '(' query_expr ')' {
-            if (!insideSelect()) {
+            //if (!insideSelect()) {
               $v = new SubqueryValue(nat,$query_expr.text);
-            }
+            //}
           }
         ;
 
@@ -137,14 +176,17 @@ array_path
         | field_path
         ;
 
-bool_expression
-        : expression bool_op expression
-        | bool_expression rel bool_expression
-        | expression IS NOT? (TRUE | FALSE | NULL)
+bool_expression returns [ Value v = null ]
+        : a1=expression bool_op b1=expression { $v = new BooleanExpressionValue($bool_op.text,$a1.v,$b1.v); }
+        | a2=bool_expression rel b2=bool_expression { $v = new BooleanExpressionValue($rel.text,$a2.v,$b2.v); }
+        | bool_expression IS n1=NOT? bool_or_null_value {
+            String op = $n1 != null ? "!=" : "=";
+            $v = new BooleanExpressionValue(op,$bool_expression.v,$bool_or_null_value.v);
+          }
         | expression BETWEEN expression AND expression
         | expression NOT? LIKE expression
         | expression NOT? IN ( array_expression | '(' query_expr ')' | UNNEST '(' array_expression ')' )
-        | bool_value
+        | bool_value { $v = $bool_value.v; }
         | function
         ;
 
@@ -158,8 +200,8 @@ cast_expression
         : CAST '(' expression AS type ')'
         ;
 
-bool_op : cond
-        ;
+//bool_op : cond
+//        ;
 
 column_name
         : table_name '.' ID
@@ -222,7 +264,7 @@ update_stmt
             ]
         : UPDATE ID { currentTable = $ID.text; }
             SET ID EQ expression { $kvs.add(new KeyValue($ID.text,$expression.v)); } ( ',' ID EQ expression { $kvs.add(new KeyValue($ID.text,$expression.v)); } )*
-            where_stmt ( LIMIT ln=NUMBER )? {
+            where_stmt ( LIMIT ln=INT_VAL )? {
               if ($where_stmt.where != null && $where_stmt.where.onlyPrimaryKey()) {
                 nat.update(currentTable,$kvs,$where_stmt.where);
               } else {
@@ -286,7 +328,7 @@ scalar_type
         | TIMESTAMP
         ;
 
-length  : NUMBER
+length  : INT_VAL
         | MAX
         ;
 
@@ -337,6 +379,7 @@ show_stmt returns [ ResultSet resultSet = null ]
         | SHOW (FULL)? ID { if (!$ID.text.equalsIgnoreCase("COLUMNS")) throw new RuntimeException("Unknown token:" + $ID.text); } (FROM|IN) ID  { $resultSet = nat.showColumns($ID.text); }
         | (DESC|DESCRIBE) ID  { $resultSet = nat.showColumns($ID.text); }
         | SHOW CREATE TABLE ID { $resultSet = nat.showCreateTable($ID.text); }
+        | SHOW INDEX (FROM|IN) ID { $resultSet = nat.showIndexes($ID.text); }
         ;
 
 value returns [ Value v = null ]
@@ -349,25 +392,39 @@ value returns [ Value v = null ]
 array_value returns [ Value v = null ]
         locals [ List<String> vlist = new ArrayList<String>(); ]
         : (ARRAY '<' scalar_type '>') '[' (scalar_value { $vlist.add($scalar_value.v.text()); } (',' scalar_value { $vlist.add($scalar_value.v.text()); })* )? ']' {
-            $v = new ArrayValue($vlist);
+            /*if (!insideSelect())*/ $v = new ArrayValue($vlist);
           }
-        | ARRAY '(' query_stmt ')'
+        | ARRAY '(' query_stmt ')' {
+            /*if (!insideSelect()) $v = (new SubqueryValue(nat,$query_stmt.text)).eval().asArray(); */
+          }
         | ID
         ;
 
 scalar_value  returns [ Value v = null ]
-        : STRING { $v = new StringValue($STRING.text.substring(1,$STRING.text.length() - 1)); }
-        | NUMBER { $v = new IntValue($NUMBER.text); }
-        | bool_value { $v = $bool_value.v; }
-        | NULL { $v = NullValue$.MODULE$; }
+        : scalar_literal { $v = $scalar_literal.v; }
         | function { $v = $function.v; }
         | array_path
         ;
 
+scalar_literal  returns [ Value v = null ]
+        : STRING { /*if (!insideSelect())*/ $v = new StringValue($STRING.text.substring(1,$STRING.text.length() - 1)); }
+        | INT_VAL { /*if (!insideSelect())*/ $v = new IntValue($INT_VAL.text,0,false); }
+        | DBL_VAL { $v = new DoubleValue($DBL_VAL.text,0,false); }
+        | bool_or_null_value { $v = $bool_or_null_value.v; }
+        ;
+
+bool_or_null_value returns [ Value v = null ]
+        : bool_value { $v = $bool_value.v; }
+        | null_value { $v = $null_value.v; }
+        ;
 
 bool_value  returns [ Value v = null ]
-        : TRUE { $v = new IntValue($TRUE.text); }
-        | FALSE { $v = new IntValue($FALSE.text); }
+        : TRUE { $v = new BooleanValue(true); }
+        | FALSE { $v = new BooleanValue(false); }
+        ;
+
+null_value returns [ Value v = null ]
+        : NULL { $v = NullValue$.MODULE$; }
         ;
 
 struct_value returns [ StructValue v = null; ]
@@ -375,13 +432,9 @@ struct_value returns [ StructValue v = null; ]
         ;
 
 function returns [ Value v = null ]
-        : ID '(' (MUL | expression (',' expression)* )? ')' {
-            if ($ID.text.toUpperCase().equals("NOW")) {
-              Timestamp ts = Timestamp.now();
-              $v = new StringValue(ts.toString());
-            } else {
-//              nat.unknownFunction($ID.text);
-            }
+        locals [ List<Value> vlist = new ArrayList<Value>(); ]
+        : ID '(' (MUL | expression { $vlist.add($expression.v); } (',' expression { $vlist.add($expression.v); })* )? ')' {
+            $v = new FunctionValue($ID.text.toUpperCase(),$vlist);
           }
         ;
 
@@ -403,24 +456,13 @@ values returns [ List<Value> valueList = new ArrayList<Value>() ]
         :  '(' expression { $valueList.add($expression.v); } ( ',' expression { $valueList.add($expression.v); } )* ')'
         ;
 
-bin_op  : PLUS
-        | MINUS
-        | MUL
-        | DIV
-        | BIT_SL
-        | BIT_SR
-        | BIT_AND
-        | BIT_OR
-        | BIT_XOR
-        ;
-
 rel returns [ String text = null ]
         : AND { $text = $AND.text; }
         | OR { $text = $OR.text; }
         | XOR { $text =$XOR.text; }
         ;
 
-cond returns [ String text = null ]
+bool_op returns [ String text = null ]
         : EQ { $text = $EQ.text; }
         | NEQ { $text = $NEQ.text; }
         | GT { $text = $GT.text; }

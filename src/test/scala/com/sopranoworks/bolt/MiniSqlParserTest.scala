@@ -604,5 +604,31 @@ class MiniSqlParserTest extends Specification {
       parser.minisql()
       nat.queryString must_== sql
     }
+    //
+    "SELECT 1+1" in {
+      val sql = "SELECT 1+1"
+      val (parser,nat) = _createParser(sql)
+      parser.minisql()
+      nat.queryString must_== sql
+    }
+    "SELECT 1+-1" in {
+      val sql = "SELECT 1+1"
+      val (parser,nat) = _createParser(sql)
+      parser.minisql()
+      nat.queryString must_== sql
+    }
+    "SELECT 1++1" in {
+      val sql = "SELECT 1+1"
+      val (parser,nat) = _createParser(sql)
+      parser.minisql()
+      nat.queryString must_== sql
+    }
+    "insert into test_tbl values(3, IF( (select count from test_tbl where id=2) > 0, 1, 0))" in {
+      val sql = "insert into test_tbl values(3, IF( (select count from test_tbl where id=2) > 0, 1, 0))"
+      val (parser,nat) = _createParser(sql)
+      parser.setTrace(true)
+      parser.minisql()
+      nat.queryString must_== sql
+    }
   }
 }

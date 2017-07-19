@@ -50,10 +50,10 @@ class NatTest extends Specification with BeforeAfterEach {
       res must_== true
     }
     "multiple insert" in {
-      _dbClient.get.sql("INSERT INTO test_items VALUES(0,0,0,100);")
-      _dbClient.get.sql("INSERT INTO test_items VALUES(1,0,1,100);")
-      _dbClient.get.sql("INSERT INTO test_items VALUES(2,0,2,100);")
-      _dbClient.get.sql("INSERT INTO test_items VALUES(3,0,3,100);")
+      _dbClient.get.executeQuery("INSERT INTO test_items VALUES(0,0,0,100);")
+      _dbClient.get.executeQuery("INSERT INTO test_items VALUES(1,0,1,100);")
+      _dbClient.get.executeQuery("INSERT INTO test_items VALUES(2,0,2,100);")
+      _dbClient.get.executeQuery("INSERT INTO test_items VALUES(3,0,3,100);")
 
       val resSet2 = _dbClient.get.singleUse().executeQuery(Statement.of("SELECT * FROM test_items"))
 
@@ -64,15 +64,15 @@ class NatTest extends Specification with BeforeAfterEach {
       count must_== 4
     }
     "multiple insert 2" in {
-      _dbClient.get.sql("INSERT INTO test_items (id,uid,iid,count) VALUES(0,0,0,100);")
-      _dbClient.get.sql("INSERT INTO test_items (id,uid,iid,count) VALUES(1,0,1,100);")
-      _dbClient.get.sql("INSERT INTO test_items (id,uid,iid,count) VALUES(2,0,2,100);")
-      _dbClient.get.sql("INSERT INTO test_items (id,uid,iid,count) VALUES(3,0,3,100);")
+      _dbClient.get.executeQuery("INSERT INTO test_items (id,uid,iid,count) VALUES(0,0,0,100);")
+      _dbClient.get.executeQuery("INSERT INTO test_items (id,uid,iid,count) VALUES(1,0,1,100);")
+      _dbClient.get.executeQuery("INSERT INTO test_items (id,uid,iid,count) VALUES(2,0,2,100);")
+      _dbClient.get.executeQuery("INSERT INTO test_items (id,uid,iid,count) VALUES(3,0,3,100);")
 
-      _dbClient.get.sql("INSERT INTO test_items (id,uid,iid,count) VALUES(4,0,4,100)")
-      _dbClient.get.sql("INSERT INTO test_items (id,uid,iid,count) VALUES(5,0,5,100)")
-      _dbClient.get.sql("INSERT INTO test_items (id,uid,iid,count) VALUES(6,0,6,100)")
-      _dbClient.get.sql("INSERT INTO test_items (id,uid,iid,count) VALUES(7,0,7,100)")
+      _dbClient.get.executeQuery("INSERT INTO test_items (id,uid,iid,count) VALUES(4,0,4,100)")
+      _dbClient.get.executeQuery("INSERT INTO test_items (id,uid,iid,count) VALUES(5,0,5,100)")
+      _dbClient.get.executeQuery("INSERT INTO test_items (id,uid,iid,count) VALUES(6,0,6,100)")
+      _dbClient.get.executeQuery("INSERT INTO test_items (id,uid,iid,count) VALUES(7,0,7,100)")
 
       val resSet2 = _dbClient.get.singleUse().executeQuery(Statement.of("SELECT * FROM test_items"))
 
@@ -209,9 +209,9 @@ class NatTest extends Specification with BeforeAfterEach {
       var count0 = 0
       _dbClient.get.beginTransaction {
         db =>
-          val resSet = db.sql("SELECT * FROM test_tbl01;")
+          val resSet = db.executeQuery("SELECT * FROM test_tbl01;")
           while(resSet.next()) {
-            db.sql(s"UPDATE test_tbl01 set name='new name' WHERE id=${resSet.getLong(0)};")
+            db.executeQuery(s"UPDATE test_tbl01 set name='new name' WHERE id=${resSet.getLong(0)};")
             count0 += 1
           }
       }
@@ -241,21 +241,21 @@ class NatTest extends Specification with BeforeAfterEach {
      "multiple commit" in {
       _dbClient.get.beginTransaction {
         db =>
-          db.sql("INSERT INTO test_items (id,uid,iid,count) VALUES(0,0,0,100);")
-          db.sql("INSERT INTO test_items (id,uid,iid,count) VALUES(1,0,1,100);")
-          db.sql("INSERT INTO test_items (id,uid,iid,count) VALUES(2,0,2,100);")
-          db.sql("INSERT INTO test_items (id,uid,iid,count) VALUES(3,0,3,100);")
+          db.executeQuery("INSERT INTO test_items (id,uid,iid,count) VALUES(0,0,0,100);")
+          db.executeQuery("INSERT INTO test_items (id,uid,iid,count) VALUES(1,0,1,100);")
+          db.executeQuery("INSERT INTO test_items (id,uid,iid,count) VALUES(2,0,2,100);")
+          db.executeQuery("INSERT INTO test_items (id,uid,iid,count) VALUES(3,0,3,100);")
       }
 
       _dbClient.get.beginTransaction {
         db =>
-          val resSet = db.sql(s"SELECT * FROM test_items WHERE uid=0")
+          val resSet = db.executeQuery(s"SELECT * FROM test_items WHERE uid=0")
           while(resSet.next()) {}
 
-          db.sql("INSERT INTO test_items (id,uid,iid,count) VALUES(4,0,4,100)")
-          db.sql("INSERT INTO test_items (id,uid,iid,count) VALUES(5,0,5,100)")
-          db.sql("INSERT INTO test_items (id,uid,iid,count) VALUES(6,0,6,100)")
-          db.sql("INSERT INTO test_items (id,uid,iid,count) VALUES(7,0,7,100)")
+          db.executeQuery("INSERT INTO test_items (id,uid,iid,count) VALUES(4,0,4,100)")
+          db.executeQuery("INSERT INTO test_items (id,uid,iid,count) VALUES(5,0,5,100)")
+          db.executeQuery("INSERT INTO test_items (id,uid,iid,count) VALUES(6,0,6,100)")
+          db.executeQuery("INSERT INTO test_items (id,uid,iid,count) VALUES(7,0,7,100)")
       }
       val resSet2 = _dbClient.get.executeQuery("SELECT * FROM test_items;")
       var count = 0
@@ -271,7 +271,7 @@ class NatTest extends Specification with BeforeAfterEach {
       while(n < 12) {
         _dbClient.get.beginTransaction {
           db =>
-            val resSet = db.sql(s"SELECT * FROM $table WHERE uid=$uid")
+            val resSet = db.executeQuery(s"SELECT * FROM $table WHERE uid=$uid")
             var r = List.empty[Item]
             while (resSet.next()) {
                 r ::= Item(resSet.getLong(0), resSet.getLong(1), resSet.getLong(2), resSet.getLong(3).toInt)
@@ -279,12 +279,12 @@ class NatTest extends Specification with BeforeAfterEach {
             r = r.reverse
 
             if (r.length >= 6) {
-              (0 until 4).foreach(i => db.sql(s"DELETE FROM $table WHERE id=${r(i).trId}"))
-              (4 until 6).foreach(i => db.sql(s"UPDATE $table SET count=${r(i).count + 10} WHERE id=${r(i).trId}"))
+              (0 until 4).foreach(i => db.executeQuery(s"DELETE FROM $table WHERE id=${r(i).trId}"))
+              (4 until 6).foreach(i => db.executeQuery(s"UPDATE $table SET count=${r(i).count + 10} WHERE id=${r(i).trId}"))
             }
             (0 until 4).foreach{
               i =>
-                db.sql(s"INSERT INTO $table (id,uid,iid,count) VALUES(${(uid << 32) + n},$uid,$n,100)")
+                db.executeQuery(s"INSERT INTO $table (id,uid,iid,count) VALUES(${(uid << 32) + n},$uid,$n,100)")
                 n += 1
             }
         }

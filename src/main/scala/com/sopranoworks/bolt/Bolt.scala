@@ -52,29 +52,7 @@ object Bolt {
 //        parser.removeErrorListeners()
 
         try {
-//          try {
-            parser.minisql().resultSet
-//          } catch {
-//            case _: NativeSqlException =>
-//              _logger.debug("native query")
-//              _transactionContext match {
-//                case Some(tr) =>
-//                  tr.executeQuery(Statement.of(sql))
-//                case _ =>
-//                  Option(dbClient).map(_.singleUse().executeQuery(Statement.of(sql))).orNull
-//              }
-//            case _: NativeAdminSqlException =>
-//              Option(admin) match {
-//                case Some(a) =>
-//                  val op = a.adminClient.updateDatabaseDdl(a.instance,a.databaes,List(sql),null)
-//                  op.waitFor().getResult
-//                  Database.reloadWith(dbClient)
-//                case None =>
-//                  _logger.warn("Could not execute administrator query")
-//              }
-//              null
-////            case _ : ParseCancellationException =>
-//          }
+          parser.minisql().resultSet
         } catch {
           case e : Exception =>
             if (parser.minisql().resultSet != null)
@@ -397,6 +375,10 @@ object Bolt {
         case _ =>
           false
       }
+    }
+
+    def showIndexes(tableName:String):ResultSet = {
+      dbClient.singleUse().executeQuery(Statement.of(s"SELECT INDEX_NAME,INDEX_TYPE,IS_UNIQUE,IS_NULL_FILTERED FROM INFORMATION_SCHEMA.INDEXES WHERE TABLE_NAME='$tableName'"))
     }
 
     def showTables():ResultSet = {
