@@ -9,7 +9,7 @@ The wrapper for using INSERT/UPDATE/DELETE sql query on Google Cloud Spanner.
 Describe library dependency to .sbt file
 
 ```
-libraryDependencies += "com.sopranoworks" %% "bolt" % "0.8"
+libraryDependencies += "com.sopranoworks" %% "bolt" % "0.9-SNAPSHOT"
 ```
 NOTICE: Bolt currently is not registered to any maven repository.
 
@@ -18,17 +18,25 @@ And then,
 ```scala
 import Bolt._
 
-dbClinet.executeSql("INSERT INTO test_tbl01 VALUES(103,'test insert');")
+dbClinet.executeQuery("INSERT INTO test_tbl01 VALUES(103,'test insert');")
 ```
 
 It uses implicit conversion.
+
+You can use it as explicitly like this.
+
+```scala
+Nat(dbClient).executeQuery("INSERT INTO test_tbl01 VALUES(103,'test insert');")
+
+```
+
 
 #### Other functions
 
 ResultSet is able to be used as Iterator
 
 ```scala
-dbClient.executeSql("SELECT * FROM test_tbl01").map {
+dbClient.executeQuery("SELECT * FROM test_tbl01").map {
   resultSet =>
     (resultSet.getString("id"),resultSet.getString("name"))
 }
@@ -37,7 +45,7 @@ dbClient.executeSql("SELECT * FROM test_tbl01").map {
 And also
 
 ```scala
-dbClient.executeSql("SELECT * FROM test_tbl01").headOption
+dbClient.executeQuery("SELECT * FROM test_tbl01").headOption
 ```
 
 
@@ -48,6 +56,12 @@ dbClient.executeSql("SELECT * FROM test_tbl01").headOption
 
 ## Limitations
 
-* Multi primary key is currently not supported on UPDATE
-* Only simple 'where clause' is able to be used on INSERT/UPDATE
-* Complex query is not supported on INSERT/UPDATE 
+* Alias is not currently supported in INSERT/UPDATE query
+* Array expression is currently not supported in INSERT/UPDATE query
+* Only few functions are usable in INSERT/UPDATE query
+
+There is no such a limitation in SELECT and subquery.
+
+## Licence
+
+MIT

@@ -23,14 +23,6 @@ case object NullValue extends Value {
   override def text: String = "NULL"
 }
 
-//case object TrueValue extends Value {
-//  override def text: String = "TRUE"
-//}
-//
-//case object FalseValue extends Value {
-//  override def text: String = "FALSE"
-//}
-
 case class StringValue(text:String) extends Value {
   override def qtext:String = s"'$text'"
 }
@@ -102,8 +94,8 @@ case class FunctionValue(name:String,parameters:java.util.List[Value]) extends V
     }
     this
   }
-
-
+  override def asValue: Value =
+    _result.getOrElse(this.eval.asValue)
 }
 
 case class StructValue() extends Value {

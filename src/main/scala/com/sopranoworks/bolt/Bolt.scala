@@ -6,11 +6,8 @@ import com.google.cloud.Date
 import com.google.cloud.spanner.TransactionRunner.TransactionCallable
 import com.google.cloud.spanner._
 import org.antlr.v4.runtime._
-import org.antlr.v4.runtime.misc.ParseCancellationException
 import org.slf4j.LoggerFactory
-import shapeless.HNil
 
-import scala.annotation.tailrec
 import scala.collection.AbstractIterator
 import scala.collection.JavaConversions._
 import scala.collection.JavaConverters._
@@ -34,31 +31,30 @@ object Bolt {
 
     /**
       * Executing INSERT/UPDATE/DELETE query on Google Cloud Spanner
-      * @param srcSql a INSERT/UPDATE/DELETE sql statement
+      * @param srcSql sql statements
       */
-    def executeQuery(srcSql:String,admin:Admin,instanceId:String): ResultSet = /*srcSql.split(";").map(_.trim).filter(!_.isEmpty).map */ {
-//      sql =>
-        val source = new ByteArrayInputStream(srcSql.getBytes("UTF8"))
-        val input = new ANTLRInputStream(source)
-        val lexer = new MiniSqlLexer(input)
+    def executeQuery(srcSql:String,admin:Admin,instanceId:String): ResultSet = {
+      val source = new ByteArrayInputStream(srcSql.getBytes("UTF8"))
+      val input = new ANTLRInputStream(source)
+      val lexer = new MiniSqlLexer(input)
 //        lexer.removeErrorListeners()
 
-        val tokenStream = new CommonTokenStream(lexer)
-        val parser = new MiniSqlParser(tokenStream)
-        parser.setErrorHandler(new BailErrorStrategy())
-        parser.nat = this
-        parser.admin = admin
-        parser.instanceId = instanceId
+      val tokenStream = new CommonTokenStream(lexer)
+      val parser = new MiniSqlParser(tokenStream)
+      parser.setErrorHandler(new BailErrorStrategy())
+      parser.nat = this
+      parser.admin = admin
+      parser.instanceId = instanceId
 //        parser.removeErrorListeners()
 
-        try {
-          parser.minisql().resultSet
-        } catch {
-          case e : Exception =>
-            if (parser.minisql().resultSet != null)
-              parser.minisql().resultSet.close()
-            throw e
-        }
+      try {
+        parser.minisql().resultSet
+      } catch {
+        case e : Exception =>
+          if (parser.minisql().resultSet != null)
+            parser.minisql().resultSet.close()
+          throw e
+      }
     } //.lastOption.orNull
 
     def executeQuery(sql:String): ResultSet = executeQuery(sql,null,null)
@@ -120,7 +116,6 @@ object Bolt {
       val mm = values.map {
         v =>
           val m = Mutation.newInsertBuilder(tableName)
-//          columns.zip(v).foreach(kv=>if (kv._2 != NullValue) m.set(kv._1).to(kv._2.text))
           val evs = v.map(_.eval.asValue)
           columns.zip(evs).foreach {
             case (k, NullValue) =>
@@ -151,7 +146,6 @@ object Bolt {
       val mm = values.map {
         v =>
           val m = Mutation.newInsertBuilder(tableName)
-//          columns.zip(v).foreach(kv=>if (kv._2 != NullValue) m.set(kv._1.name).to(kv._2.text))
           val evs = v.map(_.eval.asValue)
           columns.zip(evs).foreach {
             case (k, NullValue) =>
@@ -190,6 +184,7 @@ object Bolt {
       }
     }
 
+    // TODO: add left types
     private def _getTargetKeys(transaction: TransactionContext,tableName:String,where:String):List[String] = {
       val tbl = Database(dbClient).table(tableName).get
       val key = tbl.key
@@ -222,7 +217,6 @@ object Bolt {
         case PrimaryKeyWhere(k,v) =>
           val m = Mutation.newUpdateBuilder(tableName)
           m.set(k).to(v)
-//          keysAndValues.foreach(kv=>m.set(kv.key).to(kv.value))
           val kve = keysAndValues.map {
             case KeyValue(k,v) =>
               KeyValue(k,v.eval.asValue)
@@ -247,7 +241,6 @@ object Bolt {
             vv=>
               val m = Mutation.newUpdateBuilder(tableName)
               m.set(k).to(vv.text)
-//              keysAndValues.foreach(kv=>m.set(kv.key).to(kv.value))
               keysAndValues.map(kv=>(kv.key,kv.value)).foreach {
                 case (k, NullValue) =>
                 case (k, ArrayValue(v)) =>
@@ -265,7 +258,7 @@ object Bolt {
           }
 
         case NormalWhere(w) =>
-          _logger.info(s"Slow update query on $tableName. Reason => $w")
+//          _logger.info(s"Slow update query on $tableName. Reason => $w")
           _transactionContext match {
             case Some(tr) =>
               val keys = _getTargetKeys(tr,tableName,w)
@@ -299,7 +292,6 @@ object Bolt {
                         k =>
                           val m = Mutation.newUpdateBuilder(tableName)
                           m.set(key).to(k)
-//                          keysAndValues.foreach(kv=>m.set(kv.key).to(kv.value))
                           keysAndValues.map(kv=>(kv.key,kv.value)).foreach {
                             case (k, NullValue) =>
                             case (k, ArrayValue(v)) =>
@@ -332,7 +324,7 @@ object Bolt {
           }
 
         case Some(NormalWhere(w)) =>
-          _logger.info(s"Slow delete query on $tableName. Reason => $w")
+//          _logger.info(s"Slow delete query on $tableName. Reason => $w")
           _transactionContext match {
             case Some(tr) =>
               val keys = _getTargetKeys(tr,tableName,w)
@@ -445,15 +437,6 @@ object Bolt {
       * Currently, when 'throws' is used in the grammar, it will cause strange result on compile time.
       * TODO: Modify to use 'throws' when it is resolved.
       */
-//    def useNative():Unit =
-//      throw new NativeSqlException
-//
-//    def useAdminNative():Unit =
-//      throw new NativeAdminSqlException
-
-    def unknownFunction(name:String):Unit =
-      throw new RuntimeException(s"Unknown function $name")
-
     def changeDatabase(name:String):Unit =
       throw DatabaseChangedException(name)
 
@@ -512,8 +495,6 @@ object Bolt {
           }
         })
     }
-
-//    def sql(q:String) = executeQuery(q,null,null)
 
     def rollback:Unit = _transactionContext.foreach(_ => _mutations = List.empty[Mutation])
   }
@@ -581,13 +562,4 @@ object Bolt {
           None
       }
   }
-
-
-
-//  def tryq(q: => ResultSet):Either[SpannerException,ResultSet] = try {
-//    Right(q)
-//  } catch {
-//    case e : SpannerException =>
-//      Left(e)
-//  }
 }
