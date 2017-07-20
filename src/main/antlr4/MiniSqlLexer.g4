@@ -27,37 +27,101 @@ fragment X:('x'|'X');
 fragment Y:('y'|'Y');
 fragment Z:('z'|'Z');
 
-CAST    : C A S T
+ADD     : A D D
         ;
 
-CREATE  : C R E A T E
+ALL     : A L L
         ;
 
 ALTER   : A L T E R
         ;
 
-DROP    : D R O P
+AS      : A S
         ;
 
-SELECT  : S E L E C T
+BY      : B Y
         ;
 
-INSERT  : I N S E R T
+CAST    : C A S T
         ;
 
-UPDATE  : U P D A T E
+COLUMN  : C O L U M N
+        ;
+
+CREATE  : C R E A T E
+        ;
+
+CROSS   : C R O S S
         ;
 
 DELETE  : D E L E T E
         ;
 
+DESCRIBE: D E S C R I B E
+        ;
+
+DROP    : D R O P
+        ;
+
+EXISTS  : E X I S T S
+        ;
+
+GROUP   : G R O U P
+        ;
+
+HAVING  : H A V I N G
+        ;
+
+INDEX   : I N D E X
+        ;
+
+IF      : I F
+        ;
+
+INSERT  : I N S E R T
+        ;
+
+INTO    : I N T O
+        ;
+
+JOIN    : J O I N
+        ;
+
+LIMIT   : L I M I T
+        ;
+
+NOT     : N O T
+        | '!'
+        ;
+
+OFFSET  : O F F S E T
+        ;
+
+ORDER   : O R D E R
+        ;
+
+ORDINAL : O R D I N A L
+        ;
+
+SELECT  : S E L E C T
+        ;
+
+SET     : S E T
+        ;
+
 SHOW    : S H O W
+        ;
+
+UNION   : U N I O N
+        ;
+
+UPDATE  : U P D A T E
         ;
 
 USE     : U S E
         ;
 
-DESCRIBE: D E S C R I B E
+USING   : U S I N G
         ;
 
 VALUES  : V A L U E S
@@ -66,64 +130,13 @@ VALUES  : V A L U E S
 WHERE   : W H E R E
         ;
 
-INTO    : I N T O
-        ;
-
-SET     : S E T
-        ;
-
-LIMIT   : L I M I T
-        ;
-
-ADD     : A D D
-        ;
-
-OFFSET  : O F F S E T
-        ;
-
-ORDINAL : O R D I N A L
-        ;
-
-HAVING  : H A V I N G
-        ;
-
-ORDER   : O R D E R
-        ;
-
-GROUP   : G R O U P
-        ;
-
-JOIN    : J O I N
-        ;
-
-UNION   : U N I O N
-        ;
-
 FROM    : F R O M
-        ;
-
-BY      : B Y
-        ;
-
-AS      : A S
-        ;
-
-ALL     : A L L
         ;
 
 DISTINCT: D I S T I N C T
         ;
 
-INDEX   : I N D E X
-        ;
-
 FULL    : F U L L
-        ;
-
-COLUMN  : C O L U M N
-        ;
-
-USING   : U S I N G
         ;
 
 INNER   : I N N E R
@@ -138,10 +151,7 @@ LEFT    : L E F T
 RIGHT   : R I G H T
         ;
 
-CROSS   : C R O S S
-        ;
-
-HASH   : H A S H
+HASH    : H A S H
         ;
 
 UNNEST  : U N N E S T
@@ -153,10 +163,6 @@ OR      : O R
 
 AND     : A N D
         | '&&'
-        ;
-
-NOT     : N O T
-        | '!'
         ;
 
 XOR     : X O R

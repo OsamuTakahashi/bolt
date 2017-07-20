@@ -189,6 +189,8 @@ bool_expression returns [ Value v = null ]
         | bit_or_expr NOT? IN ( array_expression | '(' query_expr ')' | UNNEST '(' array_expression ')' )
         | bool_value { $v = $bool_value.v; }
         | function
+        | ID
+        | field_path
         ;
 
 array_expression
@@ -286,8 +288,13 @@ delete_stmt returns [ ResultSet resultSet = null ]
         ;
 
 create_stmt returns [ Boolean isNativeQuery = true ]
-        : CREATE TABLE create_table 
-        | CREATE (UNIQUE)? (NULL_FILTERED)? INDEX
+            locals [ Boolean ifNotExists = false ]
+        : CREATE TABLE (IF NOT EXISTS { $ifNotExists = true;})? create_table {
+            $isNativeQuery = ($ifNotExists) ? !nat.tableExists($create_table.name) : true;
+          }
+        | CREATE UNIQUE? (NULL_FILTERED)? INDEX (IF NOT EXISTS { $ifNotExists = true;})? create_index {
+            $isNativeQuery = ($ifNotExists) ? !nat.indexExists($create_index.tableName,$create_index.indexName) : true;
+          }
         | CREATE DATABASE ID {
             $isNativeQuery = false;
             nat.createDatabase(admin,instanceId,$ID.text);
@@ -297,8 +304,9 @@ create_stmt returns [ Boolean isNativeQuery = true ]
 use_stmt: USE ID { nat.changeDatabase($ID.text); }
         ;
 
-create_table
-        : ID '(' column_def (',' column_def )* ')' primary_key (',' cluster )?
+create_table returns [ String name = null ]
+        : ID { $name = $ID.text; } '(' column_def (',' column_def )* ')' primary_key (',' cluster )?
+
         ;
 
 column_def
@@ -337,8 +345,8 @@ array_type
         : ARRAY '<' scalar_type '>'
         ;
 
-create_index
-        :  ID ON ID '(' key_part (',' key_part )* ')' (storing_clause (',' interleave_clause) | interleave_clause)?
+create_index returns [ String indexName = null, String tableName = null ]
+        :  ID { $indexName=$ID.text; } ON ID { $tableName = $ID.text; } '(' key_part (',' key_part )* ')' (storing_clause (',' interleave_clause)? | interleave_clause)?
         ;
 
 storing_clause
@@ -433,9 +441,9 @@ struct_value returns [ StructValue v = null; ]
         ;
 
 function returns [ Value v = null ]
-        locals [ List<Value> vlist = new ArrayList<Value>(); ]
-        : ID '(' (MUL | expression { $vlist.add($expression.v); } (',' expression { $vlist.add($expression.v); })* )? ')' {
-            $v = new FunctionValue($ID.text.toUpperCase(),$vlist);
+        locals [ List<Value> vlist = new ArrayList<Value>(), String name = null ]
+        : (ID { $name = $ID.text; }|IF { $name="IF"; }) '(' (MUL | expression { $vlist.add($expression.v); } (',' expression { $vlist.add($expression.v); })* )? ')' {
+            $v = new FunctionValue($name.toUpperCase(),$vlist);
           }
         ;
 

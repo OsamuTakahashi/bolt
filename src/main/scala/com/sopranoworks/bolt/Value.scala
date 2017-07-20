@@ -1,7 +1,17 @@
+/**
+  * Bolt
+  *
+  * Copyright (c) 2017 Osamu Takahashi
+  *
+  * This software is released under the MIT License.
+  * http://opensource.org/licenses/mit-license.php
+  *
+  * @author Osamu Takahashi
+  */
 package com.sopranoworks.bolt
 
 import com.google.cloud.Timestamp
-import com.google.cloud.spanner.{DatabaseClient, ResultSet, Struct, Type}
+import com.google.cloud.spanner.{Struct, Type}
 import com.sopranoworks.bolt.Bolt.Nat
 
 import scala.collection.JavaConverters._
@@ -399,7 +409,6 @@ case class SubqueryValue(nat:Nat,subquery:String) extends Value {
         NullValue
       case 1 =>
         val r = _getColumn(_result.get.head,0)
-//        println(r)
         r
       case _ =>
         throw new RuntimeException(s"The subquery has multi columns:$subquery")

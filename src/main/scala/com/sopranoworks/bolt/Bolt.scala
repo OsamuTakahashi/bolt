@@ -1,3 +1,13 @@
+/**
+  * Bolt
+  *
+  * Copyright (c) 2017 Osamu Takahashi
+  *
+  * This software is released under the MIT License.
+  * http://opensource.org/licenses/mit-license.php
+  *
+  * @author Osamu Takahashi
+  */
 package com.sopranoworks.bolt
 
 import java.io.ByteArrayInputStream
@@ -420,16 +430,42 @@ object Bolt {
       }
     }
 
+    private def _showCreateIndexOnTable(tableName:String):List[String] = {
+      dbClient.singleUse()
+        .executeQuery(Statement.of(s"SELECT INDEX_NAME,IS_UNIQUE,IS_NULL_FILTERED,PARENT_TABLE_NAME FROM INFORMATION_SCHEMA.INDEXES WHERE TABLE_NAME='$tableName' AND INDEX_TYPE='INDEX'"))
+        .autoclose(_.map(r=>(r.getString(0),r.getBoolean(1),r.getBoolean(2),if (!r.isNull(3)) Some(r.getString(3)) else None)).toList).flatMap {
+        case (idx,uniq,nullFiltered,parent) =>
+          s"CREATE ${if (uniq) "UNIQUE " else ""}${if (nullFiltered) "NULL_FILTERED " else ""}INDEX IF NOT EXISTS $idx ON $tableName (" ::
+          dbClient.singleUse()
+            .executeQuery(Statement.of(s"SELECT COLUMN_NAME,COLUMN_ORDERING FROM INFORMATION_SCHEMA.INDEX_COLUMNS WHERE TABLE_NAME='$tableName' AND INDEX_NAME='$idx' AND COLUMN_ORDERING IS NOT NULL ORDER BY ORDINAL_POSITION"))
+            .autoclose(_.map(r=>s"${r.getString(0)} ${r.getString(1)}").toList.mkString(",")) ::
+          ")" + {
+            val e = dbClient.singleUse()
+            .executeQuery(Statement.of(s"SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.INDEX_COLUMNS WHERE TABLE_NAME='$tableName' AND INDEX_NAME='$idx' AND COLUMN_ORDERING IS NULL"))
+              .autoclose(_.map(_.getString(0)).toList)
+              if (e.nonEmpty) e.mkString("STORING (",",",")") else ""
+          } ::
+          parent.map(p => if (p.isEmpty) p else s", INTERLEAVE IN $p").getOrElse("") + ";" :: Nil
+      }
+    }
+
     def showCreateTable(tableName:String):ResultSet = {
-      val tbl = (List(s"CREATE TABLE $tableName (") ++
+      val tbl = (List(s"CREATE TABLE IF NOT EXISTS $tableName (") ++
         _addComma(showColumns(tableName).map {
           col =>
             s"  ${col.getString("COLUMN_NAME")} ${col.getString("SPANNER_TYPE")} ${if (col.getString("IS_NULLABLE").toUpperCase.startsWith("T")) "" else "NOT NULL"}"
         }.toList) ++
-        List(s") ${_primaryKeyForTable(tableName).map(k => s"PRIMARY KEY ($k)").getOrElse("") }", s"${ _deleteActionForTable(tableName).getOrElse(""); };") )
+        List(s") ${_primaryKeyForTable(tableName).map(k => s"PRIMARY KEY ($k)").getOrElse("") }", s"${ _deleteActionForTable(tableName).getOrElse(""); };") ++
+        _showCreateIndexOnTable(tableName))
           .map(s=>Struct.newBuilder().add(tableName,Value.string(s)).build())
       ResultSets.forRows(Type.struct(List(Type.StructField.of(tableName,Type.string()))),tbl)
     }
+
+    def tableExists(tableName:String):Boolean =
+      dbClient.singleUse().executeQuery(Statement.of(s"SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA='' AND TABLE_NAME='$tableName'")).autoclose(_.map(_ =>true).toList.nonEmpty)
+
+    def indexExists(tableName:String,indexName:String):Boolean =
+      dbClient.singleUse().executeQuery(Statement.of(s"SELECT COUNT(*) FROM INFORMATION_SCHEMA.INDEXES WHERE TABLE_NAME='$tableName' AND INDEX_NAME='$indexName'")).autoclose(_.map(_ =>true).toList.nonEmpty)
 
     /**
       * Internal use
@@ -496,7 +532,7 @@ object Bolt {
         })
     }
 
-    def rollback:Unit = _transactionContext.foreach(_ => _mutations = List.empty[Mutation])
+    def rollback():Unit = _transactionContext.foreach(_ => _mutations = List.empty[Mutation])
   }
 
   trait Transaction[T] {

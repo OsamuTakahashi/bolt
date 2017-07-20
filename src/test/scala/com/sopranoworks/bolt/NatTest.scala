@@ -297,10 +297,22 @@ class NatTest extends Specification with BeforeAfterEach {
       count must_== 8
     }
   }
-  "multiple queries" should {
-    "normally success" in {
-      // TODO: Implement this
-      true must_!= true
+  "tableExists" should {
+    "the table exists" in {
+      _dbClient.get.tableExists("ACCOUNT_TABLE") must_== true
+    }
+    "the table not exists" in {
+      _dbClient.get.tableExists("IMAGINARY_TABLE") must_== true
     }
   }
+  "indexExists" should {
+    "the index exists" in {
+      _dbClient.get.indexExists("ACCOUNT_TABLE","DEVICE_ID_INDEX") must_== true
+    }
+    "the index not exists" in {
+      _dbClient.get.indexExists("ACCOUNT_TABLE","IMAGINARY_INDEX") must_== true
+    }
+  }
+
+
 }

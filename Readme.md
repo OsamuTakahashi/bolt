@@ -30,6 +30,15 @@ Nat(dbClient).executeQuery("INSERT INTO test_tbl01 VALUES(103,'test insert');")
 
 ```
 
+Transaction query is able to describe
+
+```scala
+beginTransaction {
+  tr =>
+    tr.executeQuery("INSERT INTO test_tbl01 VALUES(103,'test insert');")
+}
+```
+
 
 #### Other functions
 
@@ -48,6 +57,15 @@ And also
 dbClient.executeQuery("SELECT * FROM test_tbl01").headOption
 ```
 
+You can use ResultSet safely as like this.
+
+```scala
+dbClient.executeQuery("SELECT * FROM test_tbl01").autoclose(
+  resultSet =>
+      ...
+)
+```
+
 
 ### In Java,
 
@@ -56,7 +74,7 @@ dbClient.executeQuery("SELECT * FROM test_tbl01").headOption
 
 ## Limitations
 
-* Alias is not currently supported in INSERT/UPDATE query
+* Alias is currently not supported in INSERT/UPDATE query
 * Array expression is currently not supported in INSERT/UPDATE query
 * Only few functions are usable in INSERT/UPDATE query
 

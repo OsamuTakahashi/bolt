@@ -1,3 +1,14 @@
+/**
+  * Bolt
+  * MiniSqlParserTest
+  *
+  * Copyright (c) 2017 Osamu Takahashi
+  *
+  * This software is released under the MIT License.
+  * http://opensource.org/licenses/mit-license.php
+  *
+  * @author Osamu Takahashi
+  */
 package com.sopranoworks.bolt
 
 import java.io.ByteArrayInputStream
@@ -633,6 +644,12 @@ class MiniSqlParserTest extends Specification {
     }
     "SELECT 1++1" in {
       val sql = "SELECT 1+1"
+      val (parser, nat) = _createParser(sql)
+      parser.minisql()
+      nat.queryString must_== sql
+    }
+    "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.INDEX_COLUMNS WHERE TABLE_NAME='ACCOUNT_TABLE' AND INDEX_NAME='DEVICE_ID_INDEX' AND COLUMN_ORDERING IS NULL" in {
+      val sql = "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.INDEX_COLUMNS WHERE TABLE_NAME='ACCOUNT_TABLE' AND INDEX_NAME='DEVICE_ID_INDEX' AND COLUMN_ORDERING IS NULL"
       val (parser, nat) = _createParser(sql)
       parser.minisql()
       nat.queryString must_== sql
