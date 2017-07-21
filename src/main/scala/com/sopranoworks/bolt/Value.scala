@@ -27,6 +27,9 @@ trait Value {
   def asValue:Value = this
   def isExpression:Boolean = false
   def isBoolean:Boolean = false
+  def spannerType:Type = null
+
+  def asArray:ArrayValue = throw new RuntimeException("Could not treat the value as Array")
 }
 
 case object NullValue extends Value {
@@ -35,11 +38,13 @@ case object NullValue extends Value {
 
 case class StringValue(text:String) extends Value {
   override def qtext:String = s"'$text'"
+  override def spannerType: Type = Type.string()
 }
 
 case class BooleanValue(f:Boolean) extends Value {
   override def text:String = if (f) "TRUE" else "FALSE"
   override def isBoolean:Boolean = true
+  override def spannerType: Type = Type.bool()
 }
 
 case class IntValue(text:String,var value:Long = 0,var evaluated:Boolean = false) extends Value {
@@ -50,6 +55,7 @@ case class IntValue(text:String,var value:Long = 0,var evaluated:Boolean = false
     }
     this
   }
+  override def spannerType: Type = Type.int64()
 }
 
 case class DoubleValue(text:String,var value:Double = 0,var evaluated:Boolean = false) extends Value {
@@ -60,22 +66,56 @@ case class DoubleValue(text:String,var value:Double = 0,var evaluated:Boolean = 
     }
     this
   }
+  override def spannerType: Type = Type.float64()
 }
 
 case class TimestampValue(text:String) extends Value {
   override def qtext:String = s"'$text'"
+  override def spannerType: Type = Type.timestamp()
 }
 
 case class DateValue(text:String) extends Value {
   override def qtext:String = s"'$text'"
+  override def spannerType: Type = Type.date()
 }
 
-case class ArrayValue(values:java.util.List[String]) extends Value  {
-  override def text:String = s"[${values.asScala.mkString(",")}]"
+case class ArrayValue(var values:java.util.List[Value],var evaluated:Boolean = false,var arrayType:Type = null) extends Value  {
+  private def _isValidArray:Boolean = {
+    if (values.isEmpty) {
+      true
+    } else {
+      val t = if (arrayType != null) arrayType else values.get(0).spannerType
+      if (t != null) {
+        arrayType = t
+        values.forall(_.spannerType == t)
+      } else {
+        false
+      }
+    }
+  }
+
+  override def eval: Value = {
+    if (!evaluated) {
+      values = values.map(_.eval.asValue).filter(_ != NullValue)
+      if (!_isValidArray)
+        throw new RuntimeException("")
+      evaluated = true
+    }
+    this
+  }
+
+  def length:Int = values.length
+
+  override def text:String = values.map(_.text).mkString("[",",","]")
+  override def spannerType: Type = arrayType
+
+  override def asArray: ArrayValue = this
 }
 
 case class FunctionValue(name:String,parameters:java.util.List[Value]) extends Value {
   private var _result:Option[Value] = None
+  override def spannerType: Type = _result.map(_.spannerType).orNull
+
   override def text = s"$name(${parameters.map(_.text).mkString(",")})"
   override def eval: Value = {
     name match {
@@ -94,7 +134,7 @@ case class FunctionValue(name:String,parameters:java.util.List[Value]) extends V
             _result = Some((if (f) parameters.get(1) else parameters(2)).eval.asValue)
           case _ =>
             if (!cond.isBoolean)
-              throw new RuntimeException("The first paramter of function IF must be boolean expression")
+              throw new RuntimeException("The first parameter of function IF must be boolean expression")
 
         }
 
@@ -115,14 +155,6 @@ case class StructValue() extends Value {
 
   def addValue(v:Value):Unit = {
     members :+= v
-  }
-}
-
-case class ArrayExpressionValue(var values:List[Value]) extends Value {
-  override def text = s"[${values.map(_.text).mkString(",")}]"
-  override def eval: Value = {
-    values = values.map(_.eval.asValue)
-    this
   }
 }
 
@@ -233,6 +265,7 @@ case class ExpressionValue(op:String,left:Value,right:Value) extends Value {
 
   override def asValue: Value =
     _result.getOrElse(this.eval.asValue)
+  override def spannerType: Type = _result.map(_.spannerType).orNull
 }
 
 case class BooleanExpressionValue(op:String,left:Value,right:Value) extends Value {
@@ -314,6 +347,7 @@ case class BooleanExpressionValue(op:String,left:Value,right:Value) extends Valu
   }
   override def asValue: Value =
     _result.getOrElse(this.eval.asValue)
+  override def spannerType: Type = _result.map(_.spannerType).orNull
 }
 
 case class SubqueryValue(nat:Nat,subquery:String) extends Value {
@@ -322,39 +356,44 @@ case class SubqueryValue(nat:Nat,subquery:String) extends Value {
   private var _result:Option[List[Struct]] = None
   private var _isArray = false
   private var _numColumns = 0
+  private var _arrayType:Type = null
 
   override def text = subquery
 
-  private def _getColumn(st:Struct,idx:Int):Value = {
-    st.getColumnType(idx) match {
-      case v if v == Type.bool() =>
-        BooleanValue(st.getBoolean(idx))
-      case v if v == Type.int64() =>
-        val i = st.getLong(idx)
-        IntValue(i.toString,i,true)
-      case v if v == Type.float64() =>
-        val d = st.getDouble(idx)
-        DoubleValue(d.toString,d,true)
-      case v if v == Type.string() =>
-        StringValue(st.getString(idx))
-      case v if v == Type.timestamp() =>
-        TimestampValue(st.getTimestamp(idx).toString)
-      case v if v == Type.date() =>
-        DateValue(st.getDate(idx).toString)
-      case v if v == Type.array(Type.bool()) =>
-        ArrayValue(st.getBooleanArray(idx).map(_.toString).toList.asJava)
-      case v if v == Type.array(Type.int64()) =>
-        ArrayValue(st.getLongArray(idx).map(_.toString).toList.asJava)
-      case v if v == Type.array(Type.float64()) =>
-        ArrayValue(st.getDoubleArray(idx).map(_.toString).toList.asJava)
-      case v if v == Type.array(Type.string()) =>
-        ArrayValue(st.getStringList(idx).toList.asJava)
-      case v if v == Type.array(Type.timestamp()) =>
-        ArrayValue(st.getTimestampList(idx).map(_.toString).toList.asJava)
-      case v if v == Type.array(Type.date()) =>
-        ArrayValue(st.getDateList(idx).map(_.toString).toList.asJava)
+  private def _getColumn(st:Struct,idx:Int):Value =
+    if (st.isNull(idx)) {
+      NullValue
+    } else {
+      st.getColumnType(idx) match {
+        case v if v == Type.bool() =>
+          BooleanValue(st.getBoolean(idx))
+        case v if v == Type.int64() =>
+          val i = st.getLong(idx)
+          IntValue(i.toString,i,true)
+        case v if v == Type.float64() =>
+          val d = st.getDouble(idx)
+          DoubleValue(d.toString,d,true)
+        case v if v == Type.string() =>
+          StringValue(st.getString(idx))
+        case v if v == Type.timestamp() =>
+          TimestampValue(st.getTimestamp(idx).toString)
+        case v if v == Type.date() =>
+          DateValue(st.getDate(idx).toString)
+  //      case v if v == Type.bytes() =>
+        case v if v == Type.array(Type.bool()) =>
+          ArrayValue(st.getBooleanArray(idx).map(b=>BooleanValue(b).asValue).toList.asJava,true,Type.bool())
+        case v if v == Type.array(Type.int64()) =>
+          ArrayValue(st.getLongArray(idx).map(l=>IntValue(l.toString,l,true).asValue).toList.asJava,true,Type.int64())
+        case v if v == Type.array(Type.float64()) =>
+          ArrayValue(st.getDoubleArray(idx).map(f=>DoubleValue(f.toString,f,true).asValue).toList.asJava,true,Type.float64())
+        case v if v == Type.array(Type.string()) =>
+          ArrayValue(st.getStringList(idx).map(s=>StringValue(s).asValue).toList.asJava,true,Type.string())
+        case v if v == Type.array(Type.timestamp()) =>
+          ArrayValue(st.getTimestampList(idx).map(t=>TimestampValue(t.toString).asValue).toList.asJava,true,Type.timestamp())
+        case v if v == Type.array(Type.date()) =>
+          ArrayValue(st.getDateList(idx).map(d=>DateValue(d.toString).asValue).toList.asJava,true,Type.date())
+      }
     }
-  }
 
   private def _isArrayType(t:Type):Boolean =
     t match {
@@ -379,6 +418,7 @@ case class SubqueryValue(nat:Nat,subquery:String) extends Value {
     _numColumns = c
     if (c > 0) {
       val t = st.getColumnType(0)
+      _arrayType = t
       _isArray = _isArrayType(t)
       (1 until c).forall(st.getColumnType(_) == t)
     } else { true }
@@ -388,7 +428,7 @@ case class SubqueryValue(nat:Nat,subquery:String) extends Value {
     if (_result.isEmpty) {
       val r = nat.executeNativeQuery(subquery).autoclose(
         _.map(_.getCurrentRowAsStruct).toList)
-      if (r.length > 1)
+      if (r.length > 1 && _numColumns > 1)
         throw new RuntimeException(s"The subquery has multi rows:$subquery")
 
       r.headOption.foreach(
@@ -404,6 +444,9 @@ case class SubqueryValue(nat:Nat,subquery:String) extends Value {
   def isArray:Boolean = _isArray
 
   override def asValue:Value = {
+    val r = _result.get
+    if (r.length > 1)
+      throw new RuntimeException(s"The subquery has multi rows:$subquery")
     _numColumns match {
       case 0 =>
         NullValue
@@ -415,16 +458,30 @@ case class SubqueryValue(nat:Nat,subquery:String) extends Value {
     }
   }
 
-  def asArray:ArrayValue =
-    if (_isArray) {
-      _numColumns match {
-        case 0 =>
-          ArrayValue(List())
-        case _ =>
-          val st = _result.get.head
-          ArrayValue((0 until _numColumns).map(i =>_getColumn(st,i).text).toList.asJava)
-      }
-    } else {
-      throw new RuntimeException(s"The result of the subquery is not array:$subquery")
+  override def asArray:ArrayValue = {
+    val r = _result.get
+
+    (r.length, _numColumns) match {
+      case (_, 0) | (0, _) =>
+        ArrayValue(List())
+      case (1,1) =>
+        val st = r.head
+        if (_isArray) {
+          _getColumn(st,0).asInstanceOf[ArrayValue]
+        } else {
+          ArrayValue(List(_getColumn(st,0)).filter(_ != NullValue),true,_arrayType)
+        }
+      case (1,_) =>
+        if (_isArray)
+          throw new RuntimeException("Nested Array is not supported")
+        val st = r.head
+        ArrayValue((0 until _numColumns).map(i => _getColumn(st, i)).toList.filter(_ != NullValue).asJava,true,_arrayType)
+      case (_,1) =>
+        if (_isArray)
+          throw new RuntimeException("Nested Array is not supported")
+        ArrayValue(r.map(st => _getColumn(st, 0)).filter(_ != NullValue).asJava,true,_arrayType)
+      case _ =>
+        throw new RuntimeException(s"The subquery could not cast to array:$subquery")
     }
+  }
 }

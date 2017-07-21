@@ -4,6 +4,7 @@ options { tokenVocab=MiniSqlLexer; }
 @header {
 import java.util.ArrayDeque;
 import com.google.cloud.spanner.ResultSet;
+import com.google.cloud.spanner.Type;
 import com.google.cloud.Timestamp;
 import org.joda.time.DateTime;
 import org.joda.time.format.DateTimeFormat;
@@ -61,8 +62,8 @@ query_expr_elem
         | '(' query_expr ')'
         ;
 
-select_stmt /* throws NativeSqlException */
-        : SELECT { enterSelect(); } /*{ nat.useNative(); }*/ (ALL|DISTINCT)?  (AS STRUCT)? (MUL | expression ( AS? alias )? (',' expression ( AS? alias )? )* )
+select_stmt
+        : SELECT { enterSelect(); } (ALL|DISTINCT)?  (AS STRUCT)? (MUL | expression ( AS? alias )? (',' expression ( AS? alias )? )* )
             ( FROM from_item_with_joind (',' from_item_with_joind)* )?
             ( WHERE bool_expression )?
             ( GROUP BY expression (',' expression)* )?
@@ -74,7 +75,6 @@ set_op  : UNION (ALL|DISTINCT)
 
 from_item_with_joind
         : from_item join*
-//        | join
         ;
 
 from_item
@@ -173,8 +173,7 @@ atom returns [ Value v = null ]
         ;
 
 array_path
-        :  ID '['  (expression| OFFSET '(' expression ')' | ORDINAL '(' expression ')') ']'
-        | field_path
+        :  (ID|field_path|array_expression) '['  (expression| OFFSET '(' expression ')' | ORDINAL '(' expression ')') ']'
         ;
 
 bool_expression returns [ Value v = null ]
@@ -188,23 +187,27 @@ bool_expression returns [ Value v = null ]
         | bit_or_expr NOT? LIKE bit_or_expr
         | bit_or_expr NOT? IN ( array_expression | '(' query_expr ')' | UNNEST '(' array_expression ')' )
         | bool_value { $v = $bool_value.v; }
-        | function
+        | function { $v = $function.v; }
         | ID
         | field_path
         ;
 
 array_expression
-        : (ARRAY '<' scalar_type '>')? '[' (expression (',' expression)* )? ']'
-        | ARRAY '(' query_stmt ')'
+        returns [ Value v = null ]
+        locals [ List<Value> valueList = new ArrayList<Value>(), Type arrayType = null ]
+        : (ARRAY ('<' scalar_type { $arrayType = $scalar_type.tp; } '>')?)? '[' (expression { $valueList.add($expression.v); } (',' expression { $valueList.add($expression.v); })* )? ']' {
+            Boolean f = $arrayType != null;
+            $v = new ArrayValue($valueList,f,f ? $arrayType : null);
+          }
+        | ARRAY '(' query_stmt ')' {
+            $v = ((SubqueryValue)(new SubqueryValue(nat,$query_stmt.text)).eval()).asArray();
+          }
         | ID
         ;
 
 cast_expression
         : CAST '(' expression AS type ')'
         ;
-
-//bool_op : cond
-//        ;
 
 column_name
         : table_name '.' ID
@@ -244,14 +247,14 @@ insert_stmt returns [ ResultSet resultSet = null ]
               List<String> columns = new ArrayList<String>(),
               List< List<Value> > bulkValues = new ArrayList<List<Value>>()
             ]
-        : INSERT INTO? tbl=ID ( '(' ID { $columns.add($ID.text); } (',' ID { $columns.add($ID.text); } )*  ')' )?
+        : INSERT INTO? tbl=ID (AS? alias)? ( '(' ID { $columns.add($ID.text); } (',' ID { $columns.add($ID.text); } )*  ')' )?
             VALUES values {
               if ($columns.size() == 0)
                 nat.insert($tbl.text,$values.valueList);
               else
                 nat.insert($tbl.text,$columns,$values.valueList);
             }
-        | INSERT INTO? tbl=ID ( '(' ID { $columns.add($ID.text); } (',' ID { $columns.add($ID.text); } )*  ')' )?
+        | INSERT INTO? tbl=ID (AS? alias)? ( '(' ID { $columns.add($ID.text); } (',' ID { $columns.add($ID.text); } )*  ')' )?
             VALUES values { $bulkValues.add($values.valueList); } (',' values { $bulkValues.add($values.valueList); }) + {
               if ($columns.size() == 0)
                 nat.bulkInsert($tbl.text,$bulkValues);
@@ -265,7 +268,7 @@ update_stmt
             locals [
               List<KeyValue> kvs = new ArrayList<KeyValue>()
             ]
-        : UPDATE ID { currentTable = $ID.text; }
+        : UPDATE ID { currentTable = $ID.text; } (AS? alias)?
             SET ID EQ expression { $kvs.add(new KeyValue($ID.text,$expression.v)); } ( ',' ID EQ expression { $kvs.add(new KeyValue($ID.text,$expression.v)); } )*
             where_stmt ( LIMIT ln=INT_VAL )? {
               if ($where_stmt.where != null && $where_stmt.where.onlyPrimaryKey()) {
@@ -327,14 +330,14 @@ type    : scalar_type
         | array_type
         ;
 
-scalar_type
-        : BOOL
-        | INT64
-        | FLOAT64
-        | STRING_TYPE '(' length ')'
-        | BYTES '(' length ')'
-        | DATE
-        | TIMESTAMP
+scalar_type returns [ Type tp = null ]
+        : BOOL { $tp = Type.bool(); }
+        | INT64 { $tp = Type.int64(); }
+        | FLOAT64 { $tp = Type.float64(); }
+        | STRING_TYPE '(' length ')' { $tp = Type.string(); }
+        | BYTES '(' length ')' { $tp = Type.bytes(); }
+        | DATE { $tp = Type.date(); }
+        | TIMESTAMP { $tp = Type.timestamp(); }
         ;
 
 length  : INT_VAL
@@ -393,21 +396,21 @@ show_stmt returns [ ResultSet resultSet = null ]
 
 value returns [ Value v = null ]
         : scalar_value { $v = $scalar_value.v; }
-        | array_value { $v = $array_value.v; }
+        | array_expression { $v = $array_expression.v; }
         | struct_value
         | /* empty */ { $v = NullValue$.MODULE$; }
         ;
 
-array_value returns [ Value v = null ]
-        locals [ List<String> vlist = new ArrayList<String>(); ]
-        : (ARRAY '<' scalar_type '>') '[' (scalar_value { $vlist.add($scalar_value.v.text()); } (',' scalar_value { $vlist.add($scalar_value.v.text()); })* )? ']' {
-            /*if (!insideSelect())*/ $v = new ArrayValue($vlist);
-          }
-        | ARRAY '(' query_stmt ')' {
-            /*if (!insideSelect()) $v = (new SubqueryValue(nat,$query_stmt.text)).eval().asArray(); */
-          }
-        | ID
-        ;
+//array_value returns [ Value v = null ]
+//        locals [ List<String> vlist = new ArrayList<String>(); ]
+//        : (ARRAY '<' scalar_type '>') '[' (scalar_value { $vlist.add($scalar_value.v.text()); } (',' scalar_value { $vlist.add($scalar_value.v.text()); })* )? ']' {
+//            /*if (!insideSelect())*/ $v = new ArrayValue($vlist);
+//          }
+//        | ARRAY '(' query_stmt ')' {
+//            /*if (!insideSelect()) $v = (new SubqueryValue(nat,$query_stmt.text)).eval().asArray(); */
+//          }
+//        | ID
+//        ;
 
 scalar_value  returns [ Value v = null ]
         : scalar_literal { $v = $scalar_literal.v; }
@@ -437,7 +440,7 @@ null_value returns [ Value v = null ]
         ;
 
 struct_value returns [ StructValue v = null; ]
-        : STRUCT /*{ if (!insideSelect()) $v = new StructValue(); }*/ '(' expression (AS? ID)? { if (!insideSelect()) $v.addValue($expression.v); } (',' expression (AS? ID)? { if (!insideSelect()) $v.addValue($expression.v); })* ')'
+        : STRUCT /*{ if (!insideSelect()) $v = new StructValue(); }*/ '(' expression (AS? ID)? { /*$v.addValue($expression.v);*/ } (',' expression (AS? ID)? { /*$v.addValue($expression.v);*/ })* ')'
         ;
 
 function returns [ Value v = null ]

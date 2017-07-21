@@ -90,8 +90,8 @@ object Bolt {
 
       columns.zip(evs).foreach {
         case (k, NullValue) =>
-        case (k, ArrayValue(v)) =>
-          m.set(k.name).toStringArray(v)
+        case (k, ArrayValue(v,_,_)) =>
+          m.set(k.name).toStringArray(v.map(_.text))
         case (k, v) =>
           m.set(k.name).to(v.text)
       }
@@ -109,8 +109,8 @@ object Bolt {
 
       columns.zip(evs).foreach {
         case (k, NullValue) =>
-        case (k, ArrayValue(v)) =>
-          m.set(k).toStringArray(v)
+        case (k, ArrayValue(v,_,_)) =>
+          m.set(k).toStringArray(v.map(_.text))
         case (k, v) =>
           m.set(k).to(v.text)
       }
@@ -129,8 +129,8 @@ object Bolt {
           val evs = v.map(_.eval.asValue)
           columns.zip(evs).foreach {
             case (k, NullValue) =>
-            case (k, ArrayValue(v)) =>
-              m.set(k).toStringArray(v)
+            case (k, ArrayValue(v,_,_)) =>
+              m.set(k).toStringArray(v.map(_.text))
             case (k, v) =>
               m.set(k).to(v.text)
           }
@@ -159,8 +159,8 @@ object Bolt {
           val evs = v.map(_.eval.asValue)
           columns.zip(evs).foreach {
             case (k, NullValue) =>
-            case (k, ArrayValue(v)) =>
-              m.set(k.name).toStringArray(v)
+            case (k, ArrayValue(v,_,_)) =>
+              m.set(k.name).toStringArray(v.map(_.text))
             case (k, v) =>
               m.set(k.name).to(v.text)
           }
@@ -233,8 +233,8 @@ object Bolt {
           }
           kve.map(kv=>(kv.key,kv.value)).foreach {
             case (k, NullValue) =>
-            case (k, ArrayValue(v)) =>
-              m.set(k).toStringArray(v)
+            case (k, ArrayValue(v,_,_)) =>
+              m.set(k).toStringArray(v.map(_.text))
             case (k, v) =>
               m.set(k).to(v.text)
           }
@@ -251,10 +251,11 @@ object Bolt {
             vv=>
               val m = Mutation.newUpdateBuilder(tableName)
               m.set(k).to(vv.text)
-              keysAndValues.map(kv=>(kv.key,kv.value)).foreach {
+              val ekv = keysAndValues.map(kv => KeyValue(kv.key,kv.value.eval.asValue))
+              ekv.map(kv=>(kv.key,kv.value)).foreach {
                 case (k, NullValue) =>
-                case (k, ArrayValue(v)) =>
-                  m.set(k).toStringArray(v)
+                case (k, ArrayValue(v,_,_)) =>
+                  m.set(k).toStringArray(v.map(_.text))
                 case (k, v) =>
                   m.set(k).to(v.text)
               }
@@ -278,11 +279,11 @@ object Bolt {
                   k =>
                     val m = Mutation.newUpdateBuilder(tableName)
                     m.set(key).to(k)
-//                    keysAndValues.foreach(kv=>m.set(kv.key).to(kv.value))
-                    keysAndValues.map(kv=>(kv.key,kv.value)).foreach {
+                    val ekv = keysAndValues.map(kv => KeyValue(kv.key,kv.value.eval.asValue))
+                    ekv.map(kv=>(kv.key,kv.value)).foreach {
                       case (k, NullValue) =>
-                      case (k, ArrayValue(v)) =>
-                        m.set(k).toStringArray(v)
+                      case (k, ArrayValue(v,_,_)) =>
+                        m.set(k).toStringArray(v.map(_.text))
                       case (k, v) =>
                         m.set(k).to(v.text)
                     }
@@ -302,10 +303,11 @@ object Bolt {
                         k =>
                           val m = Mutation.newUpdateBuilder(tableName)
                           m.set(key).to(k)
-                          keysAndValues.map(kv=>(kv.key,kv.value)).foreach {
+                          val ekv = keysAndValues.map(kv => KeyValue(kv.key,kv.value.eval.asValue))
+                          ekv.map(kv=>(kv.key,kv.value)).foreach {
                             case (k, NullValue) =>
-                            case (k, ArrayValue(v)) =>
-                              m.set(k).toStringArray(v)
+                            case (k, ArrayValue(v,_,_)) =>
+                              m.set(k).toStringArray(v.map(_.text))
                             case (k, v) =>
                               m.set(k).to(v.text)
                           }

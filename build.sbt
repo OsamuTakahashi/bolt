@@ -46,7 +46,7 @@ parallelExecution in ThisBuild := false
 
 fork in run := true
 
-val projectVersion = "0.9-SNAPSHOT"
+val projectVersion = "0.10-SNAPSHOT"
 
 val noJavaDoc = Seq(
   publishArtifact in (Compile, packageDoc) := false,

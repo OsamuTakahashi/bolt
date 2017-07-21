@@ -75,7 +75,7 @@ dbClient.executeQuery("SELECT * FROM test_tbl01").autoclose(
 ## Limitations
 
 * Alias is currently not supported in INSERT/UPDATE query
-* Array expression is currently not supported in INSERT/UPDATE query
+* Bytes and Struct types are currently not supported in INSERT/UPDATE query 
 * Only few functions are usable in INSERT/UPDATE query
 
 There is no such a limitation in SELECT and subquery.
