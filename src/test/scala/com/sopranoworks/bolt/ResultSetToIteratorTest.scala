@@ -42,29 +42,29 @@ class ResultSetToIteratorTest extends Specification with BeforeAfterEach {
     val dbClient = spanner.getDatabaseClient(DatabaseId.of(options.getProjectId, config.getString("spanner.instance"), config.getString("spanner.database")))
     Database.startWith(dbClient)
     _dbClient = Some(dbClient)
-    _dbClient.foreach(_.executeQuery("DELETE test_tbl01"))
-    _dbClient.foreach(_.executeQuery("DELETE test_items"))
+    _dbClient.foreach(_.executeQuery("DELETE FROM test_tbl01"))
+    _dbClient.foreach(_.executeQuery("DELETE FROM test_items"))
   }
 
   override protected def after: Any = {
     _options.foreach(_.getService.close())
   }
 
-  "Iteration test" should {
-    "map" in {
-      _dbClient.get.executeQuery("INSERT INTO test_tbl01 (id,name) VALUES(103,'test insert');")
-      val resSet = _dbClient.get.executeQuery("SELECT * FROM test_tbl01 WHERE id=103")
-      resSet.map(r=>r.getString("name")).toList must_== List("test insert")
-//      println("begin")
-//      Thread.sleep(300000)
-//      true must_== true
-    }
-  }
-//  "error handling test" should {
-//    "null get" in {
-//      _dbClient.get.sql("INSERT INTO test_tbl01 (id,name) VALUES(103,'test insert');")
-//      val resSet = _dbClient.get.sql("SELECT * FROM test_tbl01 WHERE id=103")
-//      resSet.map(r=>r.getString("nocolumn")).toList must_== List("test insert")
+//  "Iteration test" should {
+//    "map" in {
+//      _dbClient.get.executeQuery("INSERT INTO test_tbl01 (id,name) VALUES(103,'test insert');")
+//      val resSet = _dbClient.get.executeQuery("SELECT * FROM test_tbl01 WHERE id=103")
+//      resSet.map(r=>r.getString("name")).toList must_== List("test insert")
+////      println("begin")
+////      Thread.sleep(300000)
+////      true must_== true
 //    }
 //  }
+////  "error handling test" should {
+////    "null get" in {
+////      _dbClient.get.sql("INSERT INTO test_tbl01 (id,name) VALUES(103,'test insert');")
+////      val resSet = _dbClient.get.sql("SELECT * FROM test_tbl01 WHERE id=103")
+////      resSet.map(r=>r.getString("nocolumn")).toList must_== List("test insert")
+////    }
+////  }
 }

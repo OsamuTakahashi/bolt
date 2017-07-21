@@ -14,6 +14,7 @@ val codebookLibrary = Seq("com.rustyraven" %% "codebook-runtime" % "1.3.1-SNAPSH
 ))
 
 val spannerClientLibraries = Seq(
+//  "com.google.cloud" % "google-cloud-spanner" % "0.20.3-beta",
   "com.google.cloud" % "google-cloud-spanner" % "0.19.0-beta",
   "com.google.auth" % "google-auth-library-oauth2-http" % "0.6.0",
   "com.google.guava" % "guava" % "21.0"

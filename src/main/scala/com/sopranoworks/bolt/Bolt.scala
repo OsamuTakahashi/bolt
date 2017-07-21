@@ -86,15 +86,19 @@ object Bolt {
         case None =>
           throw new RuntimeException(s"Table not found $tableName")
       }
-      val evs = values.map(_.eval.asValue)
-
-      columns.zip(evs).foreach {
-        case (k, NullValue) =>
-        case (k, ArrayValue(v,_,_)) =>
-          m.set(k.name).toStringArray(v.map(_.text))
-        case (k, v) =>
-          m.set(k.name).to(v.text)
+//      val evs = values.map(_.eval.asValue)
+      columns.zip(values).foreach {
+        case (k,v) =>
+          v.setTo(m,k.name)
       }
+
+//      columns.zip(evs).foreach {
+//        case (k, NullValue) =>
+//        case (k, ArrayValue(v,_,_)) =>
+//          m.set(k.name).toStringArray(v.map(_.text))
+//        case (k, v) =>
+//          m.set(k.name).to(v.text)
+//      }
       _transactionContext match {
         case Some(_) =>
           _mutations ++= List(m.build())
@@ -105,15 +109,19 @@ object Bolt {
 
     def insert(tableName:String,columns:java.util.List[String],values:java.util.List[Value]):Unit = {
       val m = Mutation.newInsertBuilder(tableName)
-      val evs = values.map(_.eval.asValue)
-
-      columns.zip(evs).foreach {
-        case (k, NullValue) =>
-        case (k, ArrayValue(v,_,_)) =>
-          m.set(k).toStringArray(v.map(_.text))
-        case (k, v) =>
-          m.set(k).to(v.text)
+      columns.zip(values).foreach {
+        case (k,v) =>
+          v.setTo(m,k)
       }
+//      val evs = values.map(_.eval.asValue)
+//
+//      columns.zip(evs).foreach {
+//        case (k, NullValue) =>
+//        case (k, ArrayValue(v,_,_)) =>
+//          m.set(k).toStringArray(v.map(_.text))
+//        case (k, v) =>
+//          m.set(k).to(v.text)
+//      }
       _transactionContext match {
         case Some(_) =>
           _mutations ++= List(m.build())
@@ -126,14 +134,18 @@ object Bolt {
       val mm = values.map {
         v =>
           val m = Mutation.newInsertBuilder(tableName)
-          val evs = v.map(_.eval.asValue)
-          columns.zip(evs).foreach {
-            case (k, NullValue) =>
-            case (k, ArrayValue(v,_,_)) =>
-              m.set(k).toStringArray(v.map(_.text))
-            case (k, v) =>
-              m.set(k).to(v.text)
+          columns.zip(v).foreach {
+            case (k,vv) =>
+              vv.setTo(m,k)
           }
+//          val evs = v.map(_.eval.asValue)
+//          columns.zip(evs).foreach {
+//            case (k, NullValue) =>
+//            case (k, ArrayValue(v,_,_)) =>
+//              m.set(k).toStringArray(v.map(_.text))
+//            case (k, v) =>
+//              m.set(k).to(v.text)
+//          }
           m.build()
       }
 
@@ -156,14 +168,18 @@ object Bolt {
       val mm = values.map {
         v =>
           val m = Mutation.newInsertBuilder(tableName)
-          val evs = v.map(_.eval.asValue)
-          columns.zip(evs).foreach {
-            case (k, NullValue) =>
-            case (k, ArrayValue(v,_,_)) =>
-              m.set(k.name).toStringArray(v.map(_.text))
-            case (k, v) =>
-              m.set(k.name).to(v.text)
+          columns.zip(v).foreach {
+            case (k,vv) =>
+              vv.setTo(m,k.name)
           }
+//          val evs = v.map(_.eval.asValue)
+//          columns.zip(evs).foreach {
+//            case (k, NullValue) =>
+//            case (k, ArrayValue(v,_,_)) =>
+//              m.set(k.name).toStringArray(v.map(_.text))
+//            case (k, v) =>
+//              m.set(k.name).to(v.text)
+//          }
           m.build()
       }
 
@@ -227,17 +243,21 @@ object Bolt {
         case PrimaryKeyWhere(k,v) =>
           val m = Mutation.newUpdateBuilder(tableName)
           m.set(k).to(v)
-          val kve = keysAndValues.map {
-            case KeyValue(k,v) =>
-              KeyValue(k,v.eval.asValue)
+          keysAndValues.foreach {
+            case KeyValue(k,v)=>
+              v.setTo(m,k)
           }
-          kve.map(kv=>(kv.key,kv.value)).foreach {
-            case (k, NullValue) =>
-            case (k, ArrayValue(v,_,_)) =>
-              m.set(k).toStringArray(v.map(_.text))
-            case (k, v) =>
-              m.set(k).to(v.text)
-          }
+//          val kve = keysAndValues.map {
+//            case KeyValue(k,v) =>
+//              KeyValue(k,v.eval.asValue)
+//          }
+//          kve.map(kv=>(kv.key,kv.value)).foreach {
+//            case (k, NullValue) =>
+//            case (k, ArrayValue(v,_,_)) =>
+//              m.set(k).toStringArray(v.map(_.text))
+//            case (k, v) =>
+//              m.set(k).to(v.text)
+//          }
 
           _transactionContext match {
             case Some(_) =>
@@ -251,14 +271,18 @@ object Bolt {
             vv=>
               val m = Mutation.newUpdateBuilder(tableName)
               m.set(k).to(vv.text)
-              val ekv = keysAndValues.map(kv => KeyValue(kv.key,kv.value.eval.asValue))
-              ekv.map(kv=>(kv.key,kv.value)).foreach {
-                case (k, NullValue) =>
-                case (k, ArrayValue(v,_,_)) =>
-                  m.set(k).toStringArray(v.map(_.text))
-                case (k, v) =>
-                  m.set(k).to(v.text)
+              keysAndValues.foreach {
+                case KeyValue(k,v)=>
+                  v.setTo(m,k)
               }
+//              val ekv = keysAndValues.map(kv => KeyValue(kv.key,kv.value.eval.asValue))
+//              ekv.map(kv=>(kv.key,kv.value)).foreach {
+//                case (k, NullValue) =>
+//                case (k, ArrayValue(v,_,_)) =>
+//                  m.set(k).toStringArray(v.map(_.text))
+//                case (k, v) =>
+//                  m.set(k).to(v.text)
+//              }
               m.build()
           }
           _transactionContext match {
@@ -279,14 +303,18 @@ object Bolt {
                   k =>
                     val m = Mutation.newUpdateBuilder(tableName)
                     m.set(key).to(k)
-                    val ekv = keysAndValues.map(kv => KeyValue(kv.key,kv.value.eval.asValue))
-                    ekv.map(kv=>(kv.key,kv.value)).foreach {
-                      case (k, NullValue) =>
-                      case (k, ArrayValue(v,_,_)) =>
-                        m.set(k).toStringArray(v.map(_.text))
-                      case (k, v) =>
-                        m.set(k).to(v.text)
+                    keysAndValues.foreach {
+                      case KeyValue(k,v)=>
+                        v.setTo(m,k)
                     }
+//                    val ekv = keysAndValues.map(kv => KeyValue(kv.key,kv.value.eval.asValue))
+//                    ekv.map(kv=>(kv.key,kv.value)).foreach {
+//                      case (k, NullValue) =>
+//                      case (k, ArrayValue(v,_,_)) =>
+//                        m.set(k).toStringArray(v.map(_.text))
+//                      case (k, v) =>
+//                        m.set(k).to(v.text)
+//                    }
                     m.build()
                 }
                 _mutations ++= ml
@@ -303,14 +331,18 @@ object Bolt {
                         k =>
                           val m = Mutation.newUpdateBuilder(tableName)
                           m.set(key).to(k)
-                          val ekv = keysAndValues.map(kv => KeyValue(kv.key,kv.value.eval.asValue))
-                          ekv.map(kv=>(kv.key,kv.value)).foreach {
-                            case (k, NullValue) =>
-                            case (k, ArrayValue(v,_,_)) =>
-                              m.set(k).toStringArray(v.map(_.text))
-                            case (k, v) =>
-                              m.set(k).to(v.text)
+                          keysAndValues.foreach {
+                            case KeyValue(k,v)=>
+                              v.setTo(m,k)
                           }
+//                          val ekv = keysAndValues.map(kv => KeyValue(kv.key,kv.value.eval.asValue))
+//                          ekv.map(kv=>(kv.key,kv.value)).foreach {
+//                            case (k, NullValue) =>
+//                            case (k, ArrayValue(v,_,_)) =>
+//                              m.set(k).toStringArray(v.map(_.text))
+//                            case (k, v) =>
+//                              m.set(k).to(v.text)
+//                          }
                           m.build()
                       }
                       transaction.buffer(ml)
@@ -464,10 +496,10 @@ object Bolt {
     }
 
     def tableExists(tableName:String):Boolean =
-      dbClient.singleUse().executeQuery(Statement.of(s"SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA='' AND TABLE_NAME='$tableName'")).autoclose(_.map(_ =>true).toList.nonEmpty)
+      dbClient.singleUse().executeQuery(Statement.of(s"SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA='' AND TABLE_NAME='$tableName'")).autoclose(_.map(_ =>true).toList.nonEmpty)
 
     def indexExists(tableName:String,indexName:String):Boolean =
-      dbClient.singleUse().executeQuery(Statement.of(s"SELECT COUNT(*) FROM INFORMATION_SCHEMA.INDEXES WHERE TABLE_NAME='$tableName' AND INDEX_NAME='$indexName'")).autoclose(_.map(_ =>true).toList.nonEmpty)
+      dbClient.singleUse().executeQuery(Statement.of(s"SELECT INDEX_NAME FROM INFORMATION_SCHEMA.INDEXES WHERE TABLE_NAME='$tableName' AND INDEX_NAME='$indexName'")).autoclose(_.map(_ =>true).toList.nonEmpty)
 
     /**
       * Internal use
@@ -515,7 +547,6 @@ object Bolt {
 
     /**
       * For java
-      * @param t
       */
     def beginTransaction[T](t:Transaction[T]):T = {
       val self = this

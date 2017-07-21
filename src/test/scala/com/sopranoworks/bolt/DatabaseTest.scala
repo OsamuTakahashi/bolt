@@ -44,7 +44,7 @@ class DatabaseTest extends Specification with BeforeAfterEach {
     "normally success" in {
       val db = Database(_dbClient.get)
 
-      val tbl = db.table("test_tbl01").get
+      val tbl = db.table("TEST_TABLE").get
       tbl.isKey("id") must_== true
       tbl.isKey("name") must_!= true
       tbl.column(0).name must_== "id"

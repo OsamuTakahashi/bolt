@@ -11,7 +11,7 @@
 package com.sopranoworks.bolt
 
 import com.google.cloud.Timestamp
-import com.google.cloud.spanner.{Struct, Type}
+import com.google.cloud.spanner.{Mutation, Struct, Type}
 import com.sopranoworks.bolt.Bolt.Nat
 
 import scala.collection.JavaConverters._
@@ -30,10 +30,15 @@ trait Value {
   def spannerType:Type = null
 
   def asArray:ArrayValue = throw new RuntimeException("Could not treat the value as Array")
+
+  def setTo(m:Mutation.WriteBuilder,key:String):Unit = {
+    m.set(key).to(this.eval.asValue.text)
+  }
 }
 
 case object NullValue extends Value {
   override def text: String = "NULL"
+  override def setTo(m: Mutation.WriteBuilder, key: String): Unit = {}
 }
 
 case class StringValue(text:String) extends Value {
@@ -136,6 +141,11 @@ case class ArrayValue(var values:java.util.List[Value],var evaluated:Boolean = f
     if (n < 0 || values.length <= n) throw new ArrayIndexOutOfBoundsException
     values.get(n)
   }
+
+  override def setTo(m: Mutation.WriteBuilder, key: String): Unit = {
+    this.eval
+    m.set(key).toStringArray(values.map(_.text))
+  }
 }
 
 case class FunctionValue(name:String,parameters:java.util.List[Value]) extends Value {
@@ -235,6 +245,10 @@ case class FunctionValue(name:String,parameters:java.util.List[Value]) extends V
   }
   override def asValue: Value =
     _result.getOrElse(this.eval.asValue)
+
+  override def setTo(m: Mutation.WriteBuilder, key: String): Unit = {
+    this.eval.asValue.setTo(m,key)
+  }
 }
 
 case class StructValue() extends Value {
@@ -355,6 +369,9 @@ case class ExpressionValue(op:String,left:Value,right:Value) extends Value {
   override def asValue: Value =
     _result.getOrElse(this.eval.asValue)
   override def spannerType: Type = _result.map(_.spannerType).orNull
+  override def setTo(m: Mutation.WriteBuilder, key: String): Unit = {
+    this.eval.asValue.setTo(m,key)
+  }
 }
 
 case class BooleanExpressionValue(op:String,left:Value,right:Value) extends Value {
@@ -437,6 +454,9 @@ case class BooleanExpressionValue(op:String,left:Value,right:Value) extends Valu
   override def asValue: Value =
     _result.getOrElse(this.eval.asValue)
   override def spannerType: Type = _result.map(_.spannerType).orNull
+  override def setTo(m: Mutation.WriteBuilder, key: String): Unit = {
+    this.eval.asValue.setTo(m,key)
+  }
 }
 
 case class SubqueryValue(nat:Nat,subquery:String) extends Value {
@@ -572,5 +592,9 @@ case class SubqueryValue(nat:Nat,subquery:String) extends Value {
       case _ =>
         throw new RuntimeException(s"The subquery could not cast to array:$subquery")
     }
+  }
+
+  override def setTo(m: Mutation.WriteBuilder, key: String): Unit = {
+    this.eval.asValue.setTo(m,key)
   }
 }
