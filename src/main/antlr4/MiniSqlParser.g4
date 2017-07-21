@@ -162,18 +162,35 @@ atom returns [ Value v = null ]
         | field_path
         | scalar_value { $v = $scalar_value.v; }
         | struct_value { $v = $struct_value.v; }
-        | array_expression
+        | array_expression { $v = $array_expression.v; }
         | cast_expression
         | '(' expression ')' { $v = $expression.v; }
-        | '(' query_expr ')' {
-            //if (!insideSelect()) {
-              $v = new SubqueryValue(nat,$query_expr.text);
-            //}
-          }
+        | '(' query_expr ')' { $v = new SubqueryValue(nat,$query_expr.text); }
         ;
 
-array_path
-        :  (ID|field_path|array_expression) '['  (expression| OFFSET '(' expression ')' | ORDINAL '(' expression ')') ']'
+array_path returns [ Value v = null ]
+        locals [ Value arr = null ]
+        :  (ID|field_path|array_expression { $arr = $array_expression.v; }) '['
+            (OFFSET '(' expression ')' {
+              if ($arr == null || $expression.v == null) {
+                $v = NullValue$.MODULE$;
+              } else {
+                List<Value> p = new ArrayList<Value>();
+                p.add($arr);
+                p.add($expression.v);
+                $v = new FunctionValue("\$OFFSET",p);
+              }
+            }
+            | ORDINAL '(' expression ')' {
+              if ($arr == null || $expression.v == null) {
+                $v = NullValue$.MODULE$;
+              } else {
+                List<Value> p = new ArrayList<Value>();
+                p.add($arr);
+                p.add($expression.v);
+                $v = new FunctionValue("\$ORDINAL",p);
+              }
+            }) ']'
         ;
 
 bool_expression returns [ Value v = null ]
@@ -200,9 +217,12 @@ array_expression
             $v = new ArrayValue($valueList,f,f ? $arrayType : null);
           }
         | ARRAY '(' query_stmt ')' {
-            $v = ((SubqueryValue)(new SubqueryValue(nat,$query_stmt.text)).eval()).asArray();
+            List<Value> p = new ArrayList<Value>();
+            p.add(new SubqueryValue(nat,$query_stmt.text));
+            $v = new FunctionValue("\$ARRAY",p);
           }
         | ID
+        | field_path
         ;
 
 cast_expression
@@ -401,21 +421,10 @@ value returns [ Value v = null ]
         | /* empty */ { $v = NullValue$.MODULE$; }
         ;
 
-//array_value returns [ Value v = null ]
-//        locals [ List<String> vlist = new ArrayList<String>(); ]
-//        : (ARRAY '<' scalar_type '>') '[' (scalar_value { $vlist.add($scalar_value.v.text()); } (',' scalar_value { $vlist.add($scalar_value.v.text()); })* )? ']' {
-//            /*if (!insideSelect())*/ $v = new ArrayValue($vlist);
-//          }
-//        | ARRAY '(' query_stmt ')' {
-//            /*if (!insideSelect()) $v = (new SubqueryValue(nat,$query_stmt.text)).eval().asArray(); */
-//          }
-//        | ID
-//        ;
-
 scalar_value  returns [ Value v = null ]
         : scalar_literal { $v = $scalar_literal.v; }
         | function { $v = $function.v; }
-        | array_path
+        | array_path { $v = $array_path.v; }
         ;
 
 scalar_literal  returns [ Value v = null ]

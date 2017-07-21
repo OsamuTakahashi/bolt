@@ -27,6 +27,7 @@ import scala.collection.JavaConversions._
 class MiniSqlParserTest extends Specification {
   class DummyNat(dbClient:DatabaseClient = null) extends Nat(dbClient) {
     var queryString = ""
+
     override def executeNativeQuery(sql: String): ResultSet = {
       queryString = sql
       null
@@ -42,6 +43,12 @@ class MiniSqlParserTest extends Specification {
           queryString = w
       }
     }
+
+    override def update(tableName: String, keysAndValues: util.List[KeyValue], where: Where): Unit = {
+      queryString = keysAndValues.get(0).value.eval.asValue.text
+    }
+
+    override def isKey(tableName: String, columnName: String): Boolean = false
   }
 
   private def _createParser(sql:String) = {
@@ -670,6 +677,30 @@ class MiniSqlParserTest extends Specification {
       parser.minisql()
       nat.queryString must_== "WHERE id > 0"
 
+    }
+  }
+  "array_path" should {
+    "OFFSET" in {
+      val sql = "UPDATE test_tbl SET count=ARRAY<INT64>[0,1,2][OFFSET(0)] WHERE ID=0"
+      val (parser,nat) = _createParser(sql)
+      parser.minisql()
+      nat.queryString must_== "0"
+    }
+    "OFFSET out of range" in {
+      val sql = "UPDATE test_tbl SET count=ARRAY<INT64>[0,1,2][OFFSET(3)] WHERE ID=0"
+      val (parser,nat) = _createParser(sql)
+      parser.minisql() must throwA[RuntimeException]
+    }
+    "ORDINAL" in {
+      val sql = "UPDATE test_tbl SET count=ARRAY<INT64>[0,1,2][ORDINAL(1)] WHERE ID=0"
+      val (parser,nat) = _createParser(sql)
+      parser.minisql()
+      nat.queryString must_== "0"
+    }
+    "ORDINAL out of range" in {
+      val sql = "UPDATE test_tbl SET count=ARRAY<INT64>[0,1,2][ORDINAL(0)] WHERE ID=0"
+      val (parser,nat) = _createParser(sql)
+      parser.minisql() must throwA[RuntimeException]
     }
   }
 }

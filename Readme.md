@@ -71,12 +71,18 @@ dbClient.executeQuery("SELECT * FROM test_tbl01").autoclose(
 
 ...
 
+### Notice
+
+Nat instance is not thread safe.
+You must create a instance per thread.
+
 
 ## Limitations
 
 * Alias is currently not supported in INSERT/UPDATE query
 * Bytes and Struct types are currently not supported in INSERT/UPDATE query 
 * Only few functions are usable in INSERT/UPDATE query
+* CASE Conditional expressions is currently not supported in INSERT/UPDATE query
 
 There is no such a limitation in SELECT and subquery.
 

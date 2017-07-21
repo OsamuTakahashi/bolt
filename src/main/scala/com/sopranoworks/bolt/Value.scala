@@ -110,6 +110,32 @@ case class ArrayValue(var values:java.util.List[Value],var evaluated:Boolean = f
   override def spannerType: Type = arrayType
 
   override def asArray: ArrayValue = this
+
+  def offset(v:Value):Value = {
+    val n = v.eval.asValue match {
+      case NullValue =>
+        0
+      case IntValue(_,i,_) =>
+        i.toInt
+      case _ =>
+        throw new RuntimeException("Array offset type must be int64")
+    }
+    if (n < 0 || values.length <= n) throw new ArrayIndexOutOfBoundsException
+    values.get(n)
+  }
+
+  def ordinal(v:Value):Value = {
+    val n = v.eval.asValue match {
+      case NullValue =>
+        0
+      case IntValue(_,i,_) =>
+        i.toInt - 1
+      case _ =>
+        throw new RuntimeException("Array offset type must be int64")
+    }
+    if (n < 0 || values.length <= n) throw new ArrayIndexOutOfBoundsException
+    values.get(n)
+  }
 }
 
 case class FunctionValue(name:String,parameters:java.util.List[Value]) extends Value {
@@ -125,6 +151,10 @@ case class FunctionValue(name:String,parameters:java.util.List[Value]) extends V
         val ts = Timestamp.now()
         _result = Some(TimestampValue(ts.toString))
 
+      case "COALESCE" =>
+        if (parameters.isEmpty)
+          throw new RuntimeException("Function COALESCE takes least 1 parameter")
+        _result = parameters.find(_.eval.asValue != NullValue).orElse(Some(NullValue))
       case "IF" =>
         if (parameters.length != 3)
           throw new RuntimeException("Function IF takes 3 parameters")
@@ -135,9 +165,68 @@ case class FunctionValue(name:String,parameters:java.util.List[Value]) extends V
           case _ =>
             if (!cond.isBoolean)
               throw new RuntimeException("The first parameter of function IF must be boolean expression")
+        }
+      case "IFNULL" =>
+        if (parameters.length != 2)
+          throw new RuntimeException("Function IF takes 2 parameters")
+        parameters.get(0).eval.asValue match {
+          case NullValue =>
+            _result = Some(parameters.get(1))
+          case v =>
+            _result = Some(v)
+        }
+        
+        // Array functions
+      case "ARRAY_LENGTH" =>
+        if (parameters.length != 1)
+          throw new RuntimeException("Function ARRAY_LENGTH takes 1 parameter")
 
+        parameters.get(0).eval.asValue match {
+          case arr:ArrayValue =>
+            val l = arr.length
+            _result = Some(IntValue(l.toString,l,true))
+          case _ =>
+            throw new RuntimeException("The parameter type of ARRAY_LENGTH must be ARRAY")
         }
 
+
+        // internal functions
+      case "$ARRAY" =>
+        if (parameters.length != 1)
+          throw new RuntimeException("Function IF takes 1 parameter")
+
+        _result = Some(parameters.head match {
+          case v:ArrayValue =>
+            v
+          case q:SubqueryValue =>
+            q.eval.asArray
+          case _ =>
+            throw new RuntimeException("Could not convert to an array")
+        })
+
+      case "$OFFSET" =>
+        if (parameters.length != 2)
+          throw new RuntimeException("Function IF takes 1 parameter")
+        (parameters.get(0).eval.asValue,parameters.get(1).eval.asValue) match {
+          case (arr:ArrayValue,i:IntValue) =>
+            _result = Some(arr.offset(i))
+          case (_,_:IntValue) =>
+            throw new RuntimeException("Array element access with non-array value")
+          case (_:ArrayValue,_:IntValue) =>
+            throw new RuntimeException("Index type of array element access must be INT64")
+        }
+        
+      case "$ORDINAL" =>
+        if (parameters.length != 2)
+          throw new RuntimeException("Function IF takes 1 parameter")
+        (parameters.get(0).eval.asValue,parameters.get(1).eval.asValue) match {
+          case (arr:ArrayValue,i:IntValue) =>
+            _result = Some(arr.ordinal(i))
+          case (_,_:IntValue) =>
+            throw new RuntimeException("Array element access with non-array value")
+          case (_:ArrayValue,_:IntValue) =>
+            throw new RuntimeException("Index type of array element access must be INT64")
+        }
 
       case _ =>
         throw new RuntimeException(s"Unevaluatable function $name")
