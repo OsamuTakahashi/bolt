@@ -317,22 +317,18 @@ insert_stmt returns [ ResultSet resultSet = null ]
 update_stmt
             returns [ ResultSet resultSet = null ]
             locals [
-              List<KeyValue> kvs = new ArrayList<KeyValue>()
+              List<KeyValue> kvs = new ArrayList<KeyValue>(),
+              List<String> columns = new ArrayList<String>()
             ]
         : UPDATE { qc = new QueryContext(nat,qc); } table_name { currentTable = $table_name.text; } (AS? alias { qc.addAlias(new TableAlias($alias.text,$table_name.text)); })?
             SET ID EQ expression { $kvs.add(new KeyValue($ID.text,$expression.v)); } ( ',' ID EQ expression { $kvs.add(new KeyValue($ID.text,$expression.v)); } )*
             where_stmt ( LIMIT ln=INT_VAL )? {
-              /*if ($where_stmt.where != null && $where_stmt.where.onlyPrimaryKey()) {
-                nat.update(currentTable,$kvs,$where_stmt.where);
-              } else {
-                NormalWhere w = new NormalWhere($where_stmt.text);
-                if ($ln != null) {
-                  w = new NormalWhere(w.whereStmt() + " LIMIT " + $ln.text);
-                }
-                nat.update(currentTable,$kvs,w);
-              }*/
               nat.update(currentTable,$kvs,$where_stmt.where);
               qc = qc.parent();
+            }
+        | UPDATE { qc = new QueryContext(nat,qc); } table_name { currentTable = $table_name.text; } (AS? alias { qc.addAlias(new TableAlias($alias.text,$table_name.text)); })?
+            SET '(' ID { $columns.add($ID.text); } (',' ID { $columns.add($ID.text); })* ')' EQ '(' query_expr ')' where_stmt ( LIMIT ln=INT_VAL )? {
+              nat.update(currentTable, $columns, $query_expr.v, $where_stmt.where);
             }
         ;
 

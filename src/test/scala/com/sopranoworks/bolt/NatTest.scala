@@ -29,6 +29,7 @@ class NatTest extends Specification with BeforeAfterEach {
     _dbClient = Some(dbClient)
     _dbClient.foreach(_.executeQuery("DELETE FROM TEST_TABLE"))
     _dbClient.foreach(_.executeQuery("DELETE FROM TEST_ITEMS"))
+    _dbClient.foreach(_.executeQuery("DELETE FROM FROM_TABLE"))
   }
 
   override protected def after: Any = {
@@ -213,6 +214,22 @@ class NatTest extends Specification with BeforeAfterEach {
       _dbClient.get.executeQuery("DELETE FROM TEST_TABLE WHERE id>100;")
 
       count must_== 2
+    }
+    "update select" in {
+      _dbClient.get.executeQuery("INSERT INTO TEST_TABLE VALUES(101,'user1');")
+      _dbClient.get.executeQuery("INSERT INTO TEST_TABLE VALUES(102,'user2');")
+      _dbClient.get.executeQuery("INSERT INTO TEST_TABLE VALUES(103,'user3');")
+
+      _dbClient.get.executeQuery("INSERT INTO FROM_TABLE VALUES(101,1,'from');")
+
+      _dbClient.get.executeQuery("UPDATE TEST_TABLE SET (name) = (SELECT description FROM FROM_TABLE) WHERE id=101;")
+
+      val resSet = _dbClient.get.executeQuery("SELECT name from TEST_TABLE where id=101;")
+      resSet.autoclose {
+        res =>
+          res.next()
+          res.getString(0) must_== "from"
+      }
     }
   }
   "DELETE" should {

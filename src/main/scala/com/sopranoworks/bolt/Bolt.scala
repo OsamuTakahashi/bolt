@@ -321,83 +321,58 @@ object Bolt {
               }
             }))
       }
+    }
 
-      /*where match {
-        case PrimaryKeyWhere(k,v) =>
-          val m = Mutation.newUpdateBuilder(tableName)
-          m.set(k).to(v)
-          keysAndValues.foreach {
-            case KeyValue(k,v)=>
-              v.setTo(m,k)
-          }
-          _transactionContext match {
-            case Some(_) =>
-              _mutations ++= List(m.build())
-            case _ =>
-              Option(dbClient).foreach(_.write(List(m.build())))
-          }
+    private def _updateSelect(tableName: String, columns:java.util.List[String], subquery: SubqueryValue, where: NormalWhere, tr: TransactionContext) = {
+      val tbl = database.table(tableName).get
+      tbl.primaryKey.columns.foreach(k => if (columns.contains(k.name)) throw new RuntimeException(s"${k.name} is primary key"))
+      val (keys, values) = _getTargetKeysAndValues(tr, tbl, where.whereStmt, Nil)
+      val res = subquery.eval.asInstanceOf[SubqueryValue].results
+      val reader = new ColumnReader {}
+      val ml = res.map {
+        r =>
+          values.zip(r).map {
+            case (keyValues, vs) =>
+              if (columns.length != vs.getColumnCount)
+                throw new RuntimeException("")
 
-        case PrimaryKeyListWhere(k,v) =>
-          val mm = v.map {
-            vv=>
               val m = Mutation.newUpdateBuilder(tableName)
-              m.set(k).to(vv.text)
-              keysAndValues.foreach {
-                case KeyValue(k,v)=>
-                  v.setTo(m,k)
+
+              keys.zip(keyValues).foreach {
+                case (k, v) =>
+                  v.setTo(m, k.name)
+              }
+              var idx = 0
+              columns.foreach {
+                col =>
+                  reader.getColumn(vs, idx).setTo(m, col)
+                  idx += 1
               }
               m.build()
           }
-          _transactionContext match {
-            case Some(_) =>
-              _mutations ++= mm
-            case _ =>
-              Option(dbClient).foreach(_.write(mm))
-          }
+      }
+      ml.foreach {
+        mm =>
+          _mutations ++= mm
+      }
+    }
 
-        case NormalWhere(w) =>
-//          _logger.info(s"Slow update query on $tableName. Reason => $w")
-          _transactionContext match {
-            case Some(tr) =>
-              val keys = _getTargetKeys(tr,tableName,w)
-              if (keys.nonEmpty) {
-                val key = Database(dbClient).table(tableName).get.primaryKey.columns.head.name // !! TEMPORARY !!
-                val ml = keys.map {
-                  k =>
-                    val m = Mutation.newUpdateBuilder(tableName)
-                    m.set(key).to(k)
-                    keysAndValues.foreach {
-                      case KeyValue(k,v)=>
-                        v.setTo(m,k)
-                    }
-                    m.build()
+    def update(tableName:String,columns:java.util.List[String],subquery:SubqueryValue,where:NormalWhere):Unit = {
+      _transactionContext match {
+        case Some(tr) =>
+          _updateSelect(tableName, columns, subquery, where, tr)
+        case None =>
+          Option(dbClient).foreach(_.readWriteTransaction()
+            .run(new TransactionCallable[Unit] {
+              override def run(transaction: TransactionContext): Unit = {
+                _updateSelect(tableName, columns, subquery, where, transaction)
+                if (_mutations.nonEmpty) {
+                  transaction.buffer(_mutations)
+                  _mutations = List.empty[Mutation]
                 }
-                _mutations ++= ml
               }
-
-            case _ =>
-              Option(dbClient).foreach(_.readWriteTransaction()
-                .run(new TransactionCallable[Unit] {
-                  override def run(transaction: TransactionContext):Unit = {
-                    val keys = _getTargetKeys(transaction,tableName,w)
-                    if (keys.nonEmpty) {
-                      val key = Database(dbClient).table(tableName).get.primaryKey.columns.head.name // !! TEMPROARY !!
-                      val ml = keys.map {
-                        k =>
-                          val m = Mutation.newUpdateBuilder(tableName)
-                          m.set(key).to(k)
-                          keysAndValues.foreach {
-                            case KeyValue(k,v)=>
-                              v.setTo(m,k)
-                          }
-                          m.build()
-                      }
-                      transaction.buffer(ml)
-                    }
-                  }
-                }))
-          }
-      }*/
+            }))
+      }
     }
 
     /**
