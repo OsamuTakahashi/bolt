@@ -77,18 +77,20 @@ object Bolt {
     def isKey(tableName:String,columnName:String):Boolean =
       Database(dbClient).table(tableName).get.primaryKey.equalKeys(List(columnName)) // !! TEMPORARY !!
 
-    /**
-      * Internal use
-      */
-    def insert(tableName:String,values:java.util.List[Value]):Unit = {
-      val m = Mutation.newInsertBuilder(tableName)
-      val columns = database.table(tableName) match {
+    private def _tableColumns(tableName:String) =
+      database.table(tableName) match {
         case Some(tbl) =>
           tbl.columns
         case None =>
           throw new RuntimeException(s"Table not found $tableName")
       }
-      columns.zip(values).foreach {
+
+    /**
+      * Internal use
+      */
+    def insert(tableName:String,values:java.util.List[Value]):Unit = {
+      val m = Mutation.newInsertBuilder(tableName)
+      _tableColumns(tableName).zip(values).foreach {
         case (k,v) =>
           v.setTo(m,k.name)
       }
@@ -135,12 +137,7 @@ object Bolt {
 
     def bulkInsert(tableName:String,values:java.util.List[java.util.List[Value]]):Unit = {
       val m = Mutation.newInsertBuilder(tableName)
-      val columns = database.table(tableName) match {
-        case Some(tbl) =>
-          tbl.columns
-        case None =>
-          throw new RuntimeException(s"Table not found $tableName")
-      }
+      val columns = _tableColumns(tableName)
       val mm = values.map {
         v =>
           val m = Mutation.newInsertBuilder(tableName)
@@ -159,6 +156,58 @@ object Bolt {
       }
     }
 
+    def insertSelect(tableName:String,subquery:SubqueryValue):Unit = {
+      val columns = _tableColumns(tableName)
+      val reader = new ColumnReader {}
+      val ml = subquery.eval.asInstanceOf[SubqueryValue].results.map(_.map {
+        st =>
+          if (st.getColumnCount != columns.length)
+            throw new RuntimeException("")
+
+          val m = Mutation.newInsertBuilder(tableName)
+          columns.foreach {
+            col =>
+              reader.getColumn(st,col.position).setTo(m,col.name)
+          }
+          m.build()
+      })
+      ml.foreach {
+        mm =>
+          _transactionContext match {
+            case Some(_) =>
+              _mutations ++= mm
+            case _ =>
+              Option(dbClient).foreach(_.write(mm))
+          }
+      }
+    }
+
+    def insertSelect(tableName:String,columns:java.util.List[String],subquery:SubqueryValue):Unit = {
+      val reader = new ColumnReader {}
+      val ml = subquery.eval.asInstanceOf[SubqueryValue].results.map(_.map {
+        st =>
+          if (st.getColumnCount != columns.length)
+            throw new RuntimeException("")
+
+          val m = Mutation.newInsertBuilder(tableName)
+          var idx = 0
+          columns.foreach {
+            col =>
+              reader.getColumn(st,idx).setTo(m,col)
+              idx += 1
+          }
+          m.build()
+      })
+      ml.foreach {
+        mm =>
+          _transactionContext match {
+            case Some(_) =>
+              _mutations ++= mm
+            case _ =>
+              Option(dbClient).foreach(_.write(mm))
+          }
+      }
+    }
     def executeNativeQuery(sql:String):ResultSet =
       _transactionContext match {
         case Some(tr) =>

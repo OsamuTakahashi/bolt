@@ -1046,4 +1046,6 @@ case class SubqueryValue(nat:Nat,subquery:String,qc:QueryContext,expectedColumns
   }
 
   def numRows:Int = _result.map(_.length).getOrElse(0)
+
+  def results = _result
 }

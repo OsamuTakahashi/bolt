@@ -34,7 +34,7 @@ class DatabaseImpl(dbClient:DatabaseClient) extends Database {
     while(resSet.next()) {
       if (resSet.getString("TABLE_SCHEMA") != "INFORMATION_SCHEMA") {
         val t = resSet.getString("TABLE_NAME")
-        val col = Column(resSet.getString("COLUMN_NAME"), resSet.getLong("ORDINAL_POSITION").toInt, resSet.getString("SPANNER_TYPE"), resSet.getString("IS_NULLABLE") == "YES")
+        val col = Column(resSet.getString("COLUMN_NAME"), resSet.getLong("ORDINAL_POSITION").toInt - 1, resSet.getString("SPANNER_TYPE"), resSet.getString("IS_NULLABLE") == "YES")
 
         tables += t -> (col :: tables.getOrElse(t, Nil))
       }

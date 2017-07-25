@@ -63,9 +63,10 @@ query_stmt returns [ Value v = null ]
         : table_hint_expr? join_hint_expr? query_expr
         ;
 
-query_expr returns [ QueryContext q = null, Value v = null, int columns = 0 ]
+query_expr returns [ QueryContext q = null, SubqueryValue v = null, int columns = 0 ]
         : { qc = new QueryContext(nat,qc); $q = qc; }  ( query_expr_elem { $columns = $query_expr_elem.columns; } | query_expr_elem { $columns = $query_expr_elem.columns; } set_op query_expr )(ORDER BY expression (ASC|DESC)? (',' expression (ASC|DESC)? )* )? ( LIMIT count ( OFFSET skip_rows )? )? {
 //              System.out.println("query_expr:" + $query_expr.text);
+              $v = new SubqueryValue(nat,$query_expr.text,qc,$columns);
               qc = qc.parent();
             }
         ;
@@ -305,6 +306,12 @@ insert_stmt returns [ ResultSet resultSet = null ]
                 nat.bulkInsert($tbl.text,$columns,$bulkValues);
               qc = qc.parent();
             }
+        | INSERT { qc = new QueryContext(nat,qc); } INTO? tbl=ID (AS? alias)? ( '(' ID { $columns.add($ID.text); } (',' ID { $columns.add($ID.text); } )*  ')' )? query_expr {
+            if ($columns.size() == 0)
+              nat.insertSelect($tbl.text,$query_expr.v);
+            else
+              nat.insertSelect($tbl.text,$columns,$query_expr.v);
+          }
         ;
 
 update_stmt

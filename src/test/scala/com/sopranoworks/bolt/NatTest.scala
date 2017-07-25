@@ -51,6 +51,7 @@ class NatTest extends Specification with BeforeAfterEach {
       while(resSet.next()) {
         res = resSet.getString("name") == "test insert"
       }
+      resSet.close()
       _dbClient.get.executeQuery("DELETE FROM TEST_TABLE WHERE id=103;")
 
       res must_== true
@@ -67,6 +68,7 @@ class NatTest extends Specification with BeforeAfterEach {
       while(resSet2.next()) {
         count += 1
       }
+      resSet2.close()
       count must_== 4
     }
     "multiple insert 2" in {
@@ -86,7 +88,25 @@ class NatTest extends Specification with BeforeAfterEach {
       while(resSet2.next()) {
         count += 1
       }
+      resSet2.close()
       count must_== 8
+    }
+    "insert select" in {
+      _dbClient.get.executeQuery("INSERT INTO TEST_ITEMS (id,uid,iid,count) VALUES(0,0,0,100);")
+      _dbClient.get.executeQuery("INSERT INTO TEST_ITEMS (id,uid,iid,count) VALUES(1,0,1,100);")
+      _dbClient.get.executeQuery("INSERT INTO TEST_ITEMS (id,uid,iid,count) VALUES(2,0,2,100);")
+      _dbClient.get.executeQuery("INSERT INTO TEST_ITEMS (id,uid,iid,count) VALUES(3,0,3,100);")
+
+      _dbClient.get.executeQuery("INSERT INTO TEST_TABLE SELECT id,uid FROM TEST_ITEMS")
+
+      val resSet2 = _dbClient.get.singleUse().executeQuery(Statement.of("SELECT * FROM TEST_TABLE"))
+
+      var count = 0
+      while(resSet2.next()) {
+        count += 1
+      }
+      resSet2.close()
+      count must_== 4
     }
   }
   "UPDATE" should {
@@ -98,6 +118,7 @@ class NatTest extends Specification with BeforeAfterEach {
       while(resSet.next()) {
         res = resSet.getString("name") == "test insert"
       }
+      resSet.close()
       res must_== true
 
       _dbClient.get.executeQuery("UPDATE TEST_TABLE SET name='new name' WHERE id=103;")
@@ -108,6 +129,7 @@ class NatTest extends Specification with BeforeAfterEach {
       while(resSet2.next()) {
         res2 = resSet2.getString("name") == "new name"
       }
+      resSet2.close()
 
       _dbClient.get.executeQuery("DELETE FROM TEST_TABLE WHERE id=103;")
 
@@ -126,6 +148,7 @@ class NatTest extends Specification with BeforeAfterEach {
       while(resSet2.next()) {
         res2 = resSet2.getString("name") == "new name"
       }
+      resSet2.close()
 
       _dbClient.get.executeQuery("DELETE FROM TEST_TABLE WHERE id>100;")
 
@@ -145,6 +168,7 @@ class NatTest extends Specification with BeforeAfterEach {
         if (resSet2.getString("name") == "new name")
           count += 1
       }
+      resSet2.close()
 
       _dbClient.get.executeQuery("DELETE FROM TEST_TABLE WHERE id>100;")
 
@@ -164,6 +188,7 @@ class NatTest extends Specification with BeforeAfterEach {
         if (resSet2.getString("name") == "new name")
           count += 1
       }
+      resSet2.close()
 
       _dbClient.get.executeQuery("DELETE FROM TEST_TABLE WHERE id>100;")
 
@@ -183,6 +208,7 @@ class NatTest extends Specification with BeforeAfterEach {
         if (resSet2.getString("name") == "new name")
           count += 1
       }
+      resSet2.close()
 
       _dbClient.get.executeQuery("DELETE FROM TEST_TABLE WHERE id>100;")
 
@@ -203,6 +229,7 @@ class NatTest extends Specification with BeforeAfterEach {
       while(resSet2.next()) {
         count += 1
       }
+      resSet2.close()
       count must_== 2
     }
   }
@@ -221,6 +248,7 @@ class NatTest extends Specification with BeforeAfterEach {
               db.executeQuery(s"UPDATE TEST_TABLE set name='new name' WHERE id=${resSet.getLong(0)};")
               count0 += 1
             }
+            resSet.close()
           } else {
             println("ResultSet is null!!")
           }
@@ -246,6 +274,7 @@ class NatTest extends Specification with BeforeAfterEach {
       while(resSet2.next()) {
         count += 1
       }
+      resSet2.close()
       count must_== 3
     }
     "multiple commit" in {
@@ -261,6 +290,7 @@ class NatTest extends Specification with BeforeAfterEach {
         db =>
           val resSet = db.executeQuery(s"SELECT * FROM TEST_ITEMS WHERE uid=0")
           while(resSet.next()) {}
+          resSet.close()
 
           db.executeQuery("INSERT INTO TEST_ITEMS (id,uid,iid,count) VALUES(4,0,4,100)")
           db.executeQuery("INSERT INTO TEST_ITEMS (id,uid,iid,count) VALUES(5,0,5,100)")
@@ -272,6 +302,7 @@ class NatTest extends Specification with BeforeAfterEach {
       while(resSet2.next()) {
         count += 1
       }
+      resSet2.close()
       count must_== 8
     }
     "multiple commit 2" in {
@@ -304,6 +335,7 @@ class NatTest extends Specification with BeforeAfterEach {
       while(resSet2.next()) {
         count += 1
       }
+      resSet2.close()
       count must_== 8
     }
   }
