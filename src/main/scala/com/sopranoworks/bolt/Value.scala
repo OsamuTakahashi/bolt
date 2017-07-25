@@ -23,15 +23,68 @@ import scala.collection.JavaConversions._
 trait Value {
   def text:String
   def qtext:String = text
+
   def eval:Value = this
+//  def resetEavaluation:Value = this
+
+  def invalidateEvaluatedValueIfContains(values:List[Value]):Boolean = false
+  def contains(values:List[Value]):Boolean = false
+
   def asValue:Value = this
-  def isExpression:Boolean = false
+//  def isExpression:Boolean = false
   def isBoolean:Boolean = false
   def spannerType:Type = null
 
   def asArray:ArrayValue = throw new RuntimeException("Could not treat the value as Array")
 
   def setTo(m:Mutation.WriteBuilder,key:String):Unit = {
+    throw new RuntimeException("The value is not storable")
+  }
+
+//  def contains()
+
+  def resolveReference(columns:Map[String,TableColumnValue] = Map.empty[String,TableColumnValue]):Map[String,TableColumnValue] = columns
+  def getField(fieldIdx:Int):Value = throw new RuntimeException(s"The value '$text' does not have a field #$fieldIdx.")
+  def getField(fieldName:String):Value = throw new RuntimeException(s"The value '$text' does not have a field '$fieldName'.")
+}
+
+trait WrappedValue extends Value {
+  protected var _ref:Option[Value] = None
+
+  override def asValue: Value = _ref.map(_.eval.asValue).getOrElse(this)
+  override def asArray: ArrayValue = _ref.map(_.eval.asArray).getOrElse(super.asArray)
+
+  override def spannerType: Type = _ref.map(_.spannerType).orNull
+
+  override def eval: Value = _ref.map(_.eval).getOrElse(this)
+
+  override def invalidateEvaluatedValueIfContains(values:List[Value]):Boolean = {
+    _ref match {
+      case Some(v) => v.invalidateEvaluatedValueIfContains(values)
+      case None => false
+    }
+  }
+  
+//  override def resetEavaluation: Value = {
+//    _ref = None
+//    this
+//  }
+  
+  override def setTo(m: Mutation.WriteBuilder, key: String): Unit =
+    _ref match {
+      case Some(v) =>
+        v.eval.setTo(m,key)
+      case None =>
+        super.setTo(m,key)
+    }
+
+  override def resolveReference(columns: Map[String, TableColumnValue]): Map[String, TableColumnValue] = _ref.map(_.resolveReference(columns)).getOrElse(columns)
+  override def getField(fieldIdx: Int): Value = _ref.map(_.getField(fieldIdx)).getOrElse(super.getField(fieldIdx))
+  override def getField(fieldName: String): Value = _ref.map(_.getField(fieldName)).getOrElse(super.getField(fieldName))
+}
+
+trait TextSetter { _ : Value =>
+  override def setTo(m:Mutation.WriteBuilder,key:String):Unit = {
     m.set(key).to(this.eval.asValue.text)
   }
 }
@@ -41,18 +94,19 @@ case object NullValue extends Value {
   override def setTo(m: Mutation.WriteBuilder, key: String): Unit = {}
 }
 
-case class StringValue(text:String) extends Value {
+case class StringValue(text:String) extends Value with TextSetter {
   override def qtext:String = s"'$text'"
   override def spannerType: Type = Type.string()
 }
 
-case class BooleanValue(f:Boolean) extends Value {
+case class BooleanValue(f:Boolean) extends Value with TextSetter {
   override def text:String = if (f) "TRUE" else "FALSE"
   override def isBoolean:Boolean = true
   override def spannerType: Type = Type.bool()
 }
 
-case class IntValue(text:String,var value:Long = 0,var evaluated:Boolean = false) extends Value {
+case class IntValue(text:String,var value:Long = 0,var evaluated:Boolean = false) extends Value with TextSetter {
+  def this(i:Int) = this(i.toString,i,true)
   override def eval: Value = {
     if (!evaluated) {
       value = java.lang.Long.parseLong(text)
@@ -63,7 +117,11 @@ case class IntValue(text:String,var value:Long = 0,var evaluated:Boolean = false
   override def spannerType: Type = Type.int64()
 }
 
-case class DoubleValue(text:String,var value:Double = 0,var evaluated:Boolean = false) extends Value {
+object IntValue {
+  def apply(i:Int):IntValue = new IntValue(i)
+}
+
+case class DoubleValue(text:String,var value:Double = 0,var evaluated:Boolean = false) extends Value with TextSetter {
   override def eval: Value = {
     if (!evaluated) {
       value = java.lang.Double.parseDouble(text)
@@ -74,25 +132,27 @@ case class DoubleValue(text:String,var value:Double = 0,var evaluated:Boolean = 
   override def spannerType: Type = Type.float64()
 }
 
-case class TimestampValue(text:String) extends Value {
+case class TimestampValue(text:String) extends Value with TextSetter {
   override def qtext:String = s"'$text'"
   override def spannerType: Type = Type.timestamp()
 }
 
-case class DateValue(text:String) extends Value {
+case class DateValue(text:String) extends Value with TextSetter  {
   override def qtext:String = s"'$text'"
   override def spannerType: Type = Type.date()
 }
 
 case class ArrayValue(var values:java.util.List[Value],var evaluated:Boolean = false,var arrayType:Type = null) extends Value  {
+  private var _evaluated = List.empty[Value]
+
   private def _isValidArray:Boolean = {
-    if (values.isEmpty) {
+    if (_evaluated.isEmpty) {
       true
     } else {
-      val t = if (arrayType != null) arrayType else values.get(0).spannerType
+      val t = if (arrayType != null) arrayType else _evaluated(0).spannerType
       if (t != null) {
         arrayType = t
-        values.forall(_.spannerType == t)
+        _evaluated.forall(_.spannerType == t)
       } else {
         false
       }
@@ -100,8 +160,8 @@ case class ArrayValue(var values:java.util.List[Value],var evaluated:Boolean = f
   }
 
   override def eval: Value = {
-    if (!evaluated) {
-      values = values.map(_.eval.asValue).filter(_ != NullValue)
+    if (!evaluated || values.length != _evaluated.length) {
+      _evaluated = values.toList.map(_.eval.asValue).filter(_ != NullValue)
       if (!_isValidArray)
         throw new RuntimeException("")
       evaluated = true
@@ -109,12 +169,35 @@ case class ArrayValue(var values:java.util.List[Value],var evaluated:Boolean = f
     this
   }
 
-  def length:Int = values.length
+  override def invalidateEvaluatedValueIfContains(values: List[Value]): Boolean = {
+    if (values.foldLeft(false) {
+      case (f,v) => f || v.invalidateEvaluatedValueIfContains(values)
+    }) {
+      evaluated = false
+      _evaluated = List.empty[Value]
+      true
+    } else false
+  }
+
+  override def resolveReference(columns: Map[String, TableColumnValue]): Map[String, TableColumnValue] = {
+    values.foldLeft(columns) {
+      case (c,v) =>
+        v.resolveReference(c)
+    }
+  }
 
   override def text:String = values.map(_.text).mkString("[",",","]")
-  override def spannerType: Type = arrayType
+  override def spannerType: Type = {
+    eval
+    arrayType
+  }
 
   override def asArray: ArrayValue = this
+
+  def length:Int = {
+    eval
+    _evaluated.length
+  }
 
   def offset(v:Value):Value = {
     val n = v.eval.asValue match {
@@ -125,8 +208,7 @@ case class ArrayValue(var values:java.util.List[Value],var evaluated:Boolean = f
       case _ =>
         throw new RuntimeException("Array offset type must be int64")
     }
-    if (n < 0 || values.length <= n) throw new ArrayIndexOutOfBoundsException
-    values.get(n)
+    getField(n)
   }
 
   def ordinal(v:Value):Value = {
@@ -138,19 +220,198 @@ case class ArrayValue(var values:java.util.List[Value],var evaluated:Boolean = f
       case _ =>
         throw new RuntimeException("Array offset type must be int64")
     }
-    if (n < 0 || values.length <= n) throw new ArrayIndexOutOfBoundsException
-    values.get(n)
+    getField(n)
   }
 
   override def setTo(m: Mutation.WriteBuilder, key: String): Unit = {
     this.eval
     m.set(key).toStringArray(values.map(_.text))
   }
+
+  override def getField(fieldIdx:Int):Value = {
+    if (fieldIdx < 0 || values.length <= fieldIdx) throw new ArrayIndexOutOfBoundsException
+    values.get(fieldIdx)
+  }
 }
 
-case class FunctionValue(name:String,parameters:java.util.List[Value]) extends Value {
-  private var _result:Option[Value] = None
-  override def spannerType: Type = _result.map(_.spannerType).orNull
+/**
+  *
+  * @param name
+  * @param qc
+  */
+case class IdentifierValue(name:String,qc:QueryContext) extends WrappedValue {
+  override def text: String = name
+
+  override def resolveReference(columns: Map[String,TableColumnValue] = Map.empty[String,TableColumnValue]): Map[String,TableColumnValue] = {
+    var res = columns
+    qc.getAlias(name) match {
+      case Some(alias) =>
+        alias match {
+          case TableAlias(_,tableName) =>
+            _ref = Some(TableValue(tableName,qc))
+          case QueryResultAlias(_,i,q) =>
+            q.subquery match {
+              case Some(sq) =>
+                _ref = Some(ResultIndexValue(sq,i))
+              case None =>
+                _ref = Some(NullValue)  // TODO: check this
+            }
+          case ExpressionAlias(_,v) =>
+            _ref = Some(v)
+        }
+
+      case None =>
+        qc.currentTable.flatMap(tableName=>qc.nat.database.table(tableName).flatMap(_.columnIndexOf(name).map((tableName,_)))) match {
+          case Some((tableName,idx)) =>
+            val key = s"$tableName.$name"
+            columns.get(key) match {
+              case r @ Some(_) =>
+                _ref = r
+              case None =>
+                val v = TableColumnValue(name,tableName,idx)
+                _ref = Some(v)
+                res += key->v
+            }
+
+          case None =>
+            qc.nat.database.table(name) match {
+              case Some(tbl) =>
+                _ref = Some(TableValue(name,qc))
+              case None =>
+                throw new RuntimeException(s"Unresolvable identifier $name")
+            }
+        }
+    }
+    res
+  }
+
+  override def eval: Value = {
+    if (_ref.isEmpty) {
+      this.resolveReference(Map())
+    }
+    this
+  }
+}
+
+/**
+  *
+  */
+case class IdentifierWithFieldValue(name:String,fields:java.util.List[String],qc:QueryContext) extends WrappedValue {
+  override def text: String = s"$name.${fields.mkString(".")}"
+
+  override def resolveReference(columns: Map[String,TableColumnValue] = Map.empty[String,TableColumnValue]): Map[String,TableColumnValue] = {
+    if (_ref.isEmpty) {
+      val v = IdentifierValue(name, qc)
+      val vv = fields.foldLeft[Value](v) {
+        case (v, k) =>
+          ResultFieldValue(v, k)
+      }
+      _ref = Some(vv)
+    }
+    _ref.get.resolveReference(columns)
+  }
+
+  override def eval: Value = {
+    if (_ref.isEmpty) {
+      this.resolveReference(Map())
+    }
+    _ref.get.eval
+    this
+  }
+}
+
+case class SubfieldValue(value:Value,fieldNames:List[String]) extends WrappedValue {
+  override def text: String = s"${value.text}.${fieldNames.mkString(",")}"
+
+  override def eval: Value = {
+    if (_ref.isEmpty) {
+      _ref = Some(fieldNames.foldLeft(value) {
+        case (v, name) =>
+          v.getField(name)
+      })
+    }
+    this
+  }
+}
+
+/**
+  *
+  */
+case class TableValue(name:String,qc:QueryContext) extends Value {
+  override def text: String = name
+
+  //  override def eval: Value = throw new RuntimeException("A table alias is not able to used in expression")
+  override def getField(fieldName: String): Value =
+    (for {
+      tbl<-qc.nat.database.table(name)
+      col<-tbl.columns.find(_.name == fieldName)
+    } yield {
+      TableColumnValue(fieldName,name,col.position)
+    }).getOrElse(throw new RuntimeException(s"Table $name does not have a field named '$fieldName'"))
+}
+
+
+/**
+  *
+  * @note This value will be only made from IdentifierValud's resolveReference method.
+  */
+case class TableColumnValue(name:String,tableName:String,index:Int) extends WrappedValue {
+  def setValue(v:Value):Unit = _ref = Some(v)
+
+  override def text: String = s"$tableName.$name"
+  override def eval: Value =
+    _ref match {
+      case Some(v) => v
+      case None =>
+        this
+//        throw new RuntimeException("Table alias is not able tob used in expression")
+    }
+
+  override def invalidateEvaluatedValueIfContains(values:List[Value]):Boolean = {
+    if (values.contains(this)) {
+      _ref = None
+      true
+    } else {
+      false
+    }
+  }
+  
+
+  override def resolveReference(columns: Map[String,TableColumnValue] = Map.empty[String,TableColumnValue]): Map[String,TableColumnValue] = {
+    val key = s"$tableName.$name"
+    if (!columns.contains(key)) columns + (key->this) else columns
+  }
+}
+
+case class ResultIndexValue(expression:Value,index:Int) extends WrappedValue {
+  override def text = s"(${expression.text})[$index]"
+
+  override def eval: Value = {
+    if (_ref.isEmpty) {
+      _ref = Some(expression.eval.getField(index).eval)
+    }
+    this
+  }
+}
+
+case class ResultFieldValue(value:Value, fieldName:String) extends WrappedValue {
+  override def text: String = s"${value.text}.$fieldName"
+
+  override def eval: Value = {
+    if (_ref.isEmpty) {
+      _ref = Some(value.eval.getField(fieldName).eval)
+    }
+    this
+  }
+}
+
+
+/**
+  *
+  */
+case class FunctionValue(name:String,parameters:java.util.List[Value]) extends WrappedValue {
+//  private var _ref:Option[Value] = None
+//  override def spannerType: Type = _ref.map(_.spannerType).orNull
 
   override def text = s"$name(${parameters.map(_.text).mkString(",")})"
   override def eval: Value = {
@@ -159,19 +420,19 @@ case class FunctionValue(name:String,parameters:java.util.List[Value]) extends V
         if (parameters.nonEmpty)
           throw new RuntimeException("Function NOW takes no parameter")
         val ts = Timestamp.now()
-        _result = Some(TimestampValue(ts.toString))
+        _ref = Some(TimestampValue(ts.toString))
 
       case "COALESCE" =>
         if (parameters.isEmpty)
           throw new RuntimeException("Function COALESCE takes least 1 parameter")
-        _result = parameters.find(_.eval.asValue != NullValue).orElse(Some(NullValue))
+        _ref = parameters.find(_.eval.asValue != NullValue).orElse(Some(NullValue))
       case "IF" =>
         if (parameters.length != 3)
           throw new RuntimeException("Function IF takes 3 parameters")
         val cond = parameters.get(0).eval.asValue
         cond match {
           case BooleanValue(f) =>
-            _result = Some((if (f) parameters.get(1) else parameters(2)).eval.asValue)
+            _ref = Some((if (f) parameters.get(1) else parameters(2)).eval.asValue)
           case _ =>
             if (!cond.isBoolean)
               throw new RuntimeException("The first parameter of function IF must be boolean expression")
@@ -181,9 +442,9 @@ case class FunctionValue(name:String,parameters:java.util.List[Value]) extends V
           throw new RuntimeException("Function IF takes 2 parameters")
         parameters.get(0).eval.asValue match {
           case NullValue =>
-            _result = Some(parameters.get(1))
+            _ref = Some(parameters.get(1))
           case v =>
-            _result = Some(v)
+            _ref = Some(v)
         }
         
         // Array functions
@@ -194,7 +455,7 @@ case class FunctionValue(name:String,parameters:java.util.List[Value]) extends V
         parameters.get(0).eval.asValue match {
           case arr:ArrayValue =>
             val l = arr.length
-            _result = Some(IntValue(l.toString,l,true))
+            _ref = Some(IntValue(l.toString,l,true))
           case _ =>
             throw new RuntimeException("The parameter type of ARRAY_LENGTH must be ARRAY")
         }
@@ -205,7 +466,7 @@ case class FunctionValue(name:String,parameters:java.util.List[Value]) extends V
         if (parameters.length != 1)
           throw new RuntimeException("Function IF takes 1 parameter")
 
-        _result = Some(parameters.head match {
+        _ref = Some(parameters.head match {
           case v:ArrayValue =>
             v
           case q:SubqueryValue =>
@@ -219,11 +480,13 @@ case class FunctionValue(name:String,parameters:java.util.List[Value]) extends V
           throw new RuntimeException("Function IF takes 1 parameter")
         (parameters.get(0).eval.asValue,parameters.get(1).eval.asValue) match {
           case (arr:ArrayValue,i:IntValue) =>
-            _result = Some(arr.offset(i))
+            _ref = Some(arr.offset(i))
           case (_,_:IntValue) =>
             throw new RuntimeException("Array element access with non-array value")
-          case (_:ArrayValue,_:IntValue) =>
+          case (_:ArrayValue,_) =>
             throw new RuntimeException("Index type of array element access must be INT64")
+          case (_,_) =>
+            throw new RuntimeException("Invalid operation")
         }
         
       case "$ORDINAL" =>
@@ -231,11 +494,13 @@ case class FunctionValue(name:String,parameters:java.util.List[Value]) extends V
           throw new RuntimeException("Function IF takes 1 parameter")
         (parameters.get(0).eval.asValue,parameters.get(1).eval.asValue) match {
           case (arr:ArrayValue,i:IntValue) =>
-            _result = Some(arr.ordinal(i))
+            _ref = Some(arr.ordinal(i))
           case (_,_:IntValue) =>
             throw new RuntimeException("Array element access with non-array value")
-          case (_:ArrayValue,_:IntValue) =>
+          case (_:ArrayValue,_) =>
             throw new RuntimeException("Index type of array element access must be INT64")
+          case (_,_) =>
+            throw new RuntimeException("Invalid operation")
         }
 
       case _ =>
@@ -243,121 +508,210 @@ case class FunctionValue(name:String,parameters:java.util.List[Value]) extends V
     }
     this
   }
-  override def asValue: Value =
-    _result.getOrElse(this.eval.asValue)
+//  override def resetEavaluation: Value = {
+//    // !! TEMPORARY !!
+//    if (parameters.nonEmpty) super.resetEavaluation
+//    this
+//  }
+  override def invalidateEvaluatedValueIfContains(values:List[Value]):Boolean = {
+    if (parameters.foldLeft(false) {
+      case (f,v) =>
+        f || v.invalidateEvaluatedValueIfContains(values)
+    }) {
+      _ref = None
+      true
+    } else false
+  }
 
-  override def setTo(m: Mutation.WriteBuilder, key: String): Unit = {
-    this.eval.asValue.setTo(m,key)
+
+  override def resolveReference(columns:Map[String,TableColumnValue]): Map[String,TableColumnValue] = {
+    parameters.foldLeft(columns){
+      case (c,p) =>
+        p.resolveReference(c)
+    }
   }
 }
 
+/**
+  *
+  */
 case class StructValue() extends Value {
-  private var members:List[Value] = Nil
-  override def text = s"STRUCT(${members.map(_.text).mkString(",")})"
-  override def eval: Value = throw new RuntimeException("Struct is not supported yet")
+  private var _evaluated = false
+  private var _members:List[Value] = Nil
+  private var _aliases = Map.empty[String,Int]
+
+  override def text = s"STRUCT(${_members.map(_.text).mkString(",")})"
+
+  override def eval: Value = {
+    if (!_evaluated) {
+      _members = _members.map(_.eval.asValue)
+      _evaluated = true
+    }
+    this
+  }
 
   def addValue(v:Value):Unit = {
-    members :+= v
+    _members :+= v
+  }
+  def addFieldName(name:String,idx:Int):Unit = {
+    if (_aliases.contains(name))
+      throw new RuntimeException(s"Duplicate field name $name")
+    _aliases += (name->idx)
+  }
+
+  override def getField(fieldIdx: Int): Value = {
+    if (fieldIdx < 0 || _members.length <= fieldIdx)
+      throw new RuntimeException("THe specified filed index is out of range")
+    _members(fieldIdx)
+  }
+
+  override def getField(fieldName: String): Value = {
+    _aliases.get(fieldName) match {
+      case Some(idx) => getField(idx)
+      case None => throw new RuntimeException(s"The struct does not have field named '$fieldName'")
+    }
+  }
+
+  private def _isArrayType(t:Type):Boolean =
+    t match {
+      case v if v == Type.array(Type.bool()) =>
+        true
+      case v if v == Type.array(Type.int64()) =>
+        true
+      case v if v == Type.array(Type.float64()) =>
+        true
+      case v if v == Type.array(Type.string()) =>
+        true
+      case v if v == Type.array(Type.timestamp()) =>
+        true
+      case v if v == Type.array(Type.date()) =>
+        true
+      case _ =>
+        false
+    }
+
+  override def asArray: ArrayValue = {
+    this.eval
+    _members match {
+      case Nil =>
+        ArrayValue(List())
+      case head :: tail =>
+        if (!_isArrayType(head.spannerType) || !_members.forall(_.spannerType == head.spannerType))
+          throw new RuntimeException("The struct can not convert to an array")
+        ArrayValue(_members,true,head.spannerType)
+    }
+  }
+
+  override def invalidateEvaluatedValueIfContains(values:List[Value]):Boolean = {
+    _members.foldLeft(false) {
+      case (f,v) => f || v.invalidateEvaluatedValueIfContains(values)
+    }
   }
 }
 
-case class ExpressionValue(op:String,left:Value,right:Value) extends Value {
-  private var _result:Option[Value] = None
+/**
+  *
+  * @param op operator
+  * @param left left expression value
+  * @param right right expression value
+  */
+case class ExpressionValue(op:String,left:Value,right:Value) extends WrappedValue {
+//  private var _ref:Option[Value] = None
 
-  override def text = s"${left.text} $op ${right.text}"
-  override def isExpression: Boolean = true
+  override def text = s"(${left.text} $op ${right.text})"
+//  override def isExpression: Boolean = true
   override def eval: Value = {
-    if (_result.isEmpty) {
+    if (_ref.isEmpty) {
       (op, left.eval.asValue, if (right != null) right.eval.asValue else right) match {
         case ("-", l:IntValue, null) =>
           val v = -l.value
-          _result = Some(IntValue(v.toString,v,true))
+          _ref = Some(IntValue(v.toString,v,true))
         case ("-", l:DoubleValue, null) =>
           val v = -l.value
-          _result = Some(DoubleValue(v.toString,v,true))
+          _ref = Some(DoubleValue(v.toString,v,true))
         case ("~", l:IntValue, null) =>
           val v = ~l.value
-          _result = Some(IntValue(v.toString,v,true))
+          _ref = Some(IntValue(v.toString,v,true))
 
         case ("+", l:IntValue, r:IntValue) =>
           val res = l.value + r.value
-          _result = Some(IntValue(res.toString,res,true))
+          _ref = Some(IntValue(res.toString,res,true))
         case ("+", l:DoubleValue, r:DoubleValue) =>
           val res = l.value + r.value
-          _result = Some(DoubleValue(res.toString,res,true))
+          _ref = Some(DoubleValue(res.toString,res,true))
         case ("+", l:IntValue, r:DoubleValue) =>
           val res = l.value + r.value
-          _result = Some(DoubleValue(res.toString,res,true))
+          _ref = Some(DoubleValue(res.toString,res,true))
         case ("+", l:DoubleValue, r:IntValue) =>
           val res = l.value + r.value
-          _result = Some(DoubleValue(res.toString,res,true))
+          _ref = Some(DoubleValue(res.toString,res,true))
         case ("+", NullValue, _) | ("+", _, NullValue) =>
-          _result = Some(NullValue)
+          _ref = Some(NullValue)
 
         case ("-", l:IntValue, r:IntValue) =>
           val res = l.value - r.value
-          _result = Some(IntValue(res.toString,res,true))
+          _ref = Some(IntValue(res.toString,res,true))
         case ("-", l:DoubleValue, r:DoubleValue) =>
           val res = l.value - r.value
-          _result = Some(DoubleValue(res.toString,res,true))
+          _ref = Some(DoubleValue(res.toString,res,true))
         case ("-", l:IntValue, r:DoubleValue) =>
           val res = l.value - r.value
-          _result = Some(DoubleValue(res.toString,res,true))
+          _ref = Some(DoubleValue(res.toString,res,true))
         case ("-", l:DoubleValue, r:IntValue) =>
           val res = l.value - r.value
-          _result = Some(DoubleValue(res.toString,res,true))
+          _ref = Some(DoubleValue(res.toString,res,true))
         case ("-", NullValue, _) | ("-", _, NullValue) =>
-          _result = Some(NullValue)
+          _ref = Some(NullValue)
 
         case ("*", l:IntValue, r:IntValue) =>
           val res = l.value * r.value
-          _result = Some(IntValue(res.toString,res,true))
+          _ref = Some(IntValue(res.toString,res,true))
         case ("*", l:DoubleValue, r:DoubleValue) =>
           val res = l.value * r.value
-          _result = Some(DoubleValue(res.toString,res,true))
+          _ref = Some(DoubleValue(res.toString,res,true))
         case ("*", l:IntValue, r:DoubleValue) =>
           val res = l.value * r.value
-          _result = Some(DoubleValue(res.toString,res,true))
+          _ref = Some(DoubleValue(res.toString,res,true))
         case ("*", l:DoubleValue, r:IntValue) =>
           val res = l.value * r.value
-          _result = Some(DoubleValue(res.toString,res,true))
+          _ref = Some(DoubleValue(res.toString,res,true))
         case ("*", NullValue, _) | ("*", _, NullValue) =>
-          _result = Some(NullValue)
+          _ref = Some(NullValue)
           
         case ("/", l:IntValue, r:IntValue) =>
           if (r.value == 0) throw new RuntimeException("Zero divide")
           val res = l.value / r.value
-          _result = Some(IntValue(res.toString,res,true))
+          _ref = Some(IntValue(res.toString,res,true))
         case ("/", l:DoubleValue, r:DoubleValue) =>
           if (r.value == 0) throw new RuntimeException("Zero divide")
           val res = l.value / r.value
-          _result = Some(DoubleValue(res.toString,res,true))
+          _ref = Some(DoubleValue(res.toString,res,true))
         case ("/", l:IntValue, r:DoubleValue) =>
           if (r.value == 0) throw new RuntimeException("Zero divide")
           val res = l.value / r.value
-          _result = Some(DoubleValue(res.toString,res,true))
+          _ref = Some(DoubleValue(res.toString,res,true))
         case ("/", l:DoubleValue, r:IntValue) =>
           if (r.value == 0) throw new RuntimeException("Zero divide")
           val res = l.value / r.value
-          _result = Some(DoubleValue(res.toString,res,true))
+          _ref = Some(DoubleValue(res.toString,res,true))
         case ("/", NullValue, _) | ("/", _, NullValue) =>
-          _result = Some(NullValue)
+          _ref = Some(NullValue)
 
         case ("<<", l:IntValue, r:IntValue) =>
           val res = l.value << r.value
-          _result = Some(IntValue(res.toString,res,true))
+          _ref = Some(IntValue(res.toString,res,true))
         case (">>", l:IntValue, r:IntValue) =>
           val res = l.value >>> r.value
-          _result = Some(IntValue(res.toString,res,true))
+          _ref = Some(IntValue(res.toString,res,true))
         case ("|", l:IntValue, r:IntValue) =>
           val res = l.value | r.value
-          _result = Some(IntValue(res.toString,res,true))
+          _ref = Some(IntValue(res.toString,res,true))
         case ("&", l:IntValue, r:IntValue) =>
           val res = l.value & r.value
-          _result = Some(IntValue(res.toString,res,true))
+          _ref = Some(IntValue(res.toString,res,true))
         case ("^", l:IntValue, r:IntValue) =>
           val res = l.value ^ r.value
-          _result = Some(IntValue(res.toString,res,true))
+          _ref = Some(IntValue(res.toString,res,true))
 
         case _ =>
           throw new RuntimeException(s"Invalid operator between the types:$op")
@@ -366,84 +720,104 @@ case class ExpressionValue(op:String,left:Value,right:Value) extends Value {
     this
   }
 
-  override def asValue: Value =
-    _result.getOrElse(this.eval.asValue)
-  override def spannerType: Type = _result.map(_.spannerType).orNull
-  override def setTo(m: Mutation.WriteBuilder, key: String): Unit = {
-    this.eval.asValue.setTo(m,key)
+//  override def asValue: Value =
+//    _ref.getOrElse(this.eval.asValue)
+//  override def spannerType: Type = _ref.map(_.spannerType).orNull
+//  override def setTo(m: Mutation.WriteBuilder, key: String): Unit = {
+//    this.eval.asValue.setTo(m,key)
+//  }
+
+  override def invalidateEvaluatedValueIfContains(values:List[Value]):Boolean = {
+    if ((if (left != null) left.invalidateEvaluatedValueIfContains(values) else false) ||
+      (if (right != null) right.invalidateEvaluatedValueIfContains(values) else false)) {
+      _ref = None
+      true
+    } else false
+  }
+
+
+  override def resolveReference(columns:Map[String,TableColumnValue] = Map.empty[String,TableColumnValue]): Map[String,TableColumnValue] = {
+    val lc = if (left != null) left.resolveReference(columns) else columns
+    if (right != null) right.resolveReference(lc) else lc
   }
 }
 
-case class BooleanExpressionValue(op:String,left:Value,right:Value) extends Value {
-  private var _result:Option[Value] = None
-  override def text = s"${left.text} $op ${right.text}"
-  override def isExpression: Boolean = true
+/**
+  *
+  * @param op boolean operator
+  * @param left left expression value
+  * @param right right expression value
+  */
+case class BooleanExpressionValue(op:String,left:Value,right:Value) extends WrappedValue {
+//  private var _ref:Option[Value] = None
+  override def text = s"(${left.text} $op ${right.text})"
+//  override def isExpression: Boolean = true
   override def isBoolean:Boolean = true
 
   override def eval: Value = {
-    if (_result.isEmpty) {
+    if (_ref.isEmpty) {
       (op, left.eval.asValue, if (right != null) right.eval.asValue else right) match {
         case ("<",l:IntValue,r:IntValue) =>
-          _result = Some(BooleanValue(l.value < r.value))
+          _ref = Some(BooleanValue(l.value < r.value))
         case ("<",l:DoubleValue,r:DoubleValue) =>
-          _result = Some(BooleanValue(l.value < r.value))
+          _ref = Some(BooleanValue(l.value < r.value))
         case ("<",l:IntValue,r:DoubleValue) =>
-          _result = Some(BooleanValue(l.value < r.value))
+          _ref = Some(BooleanValue(l.value < r.value))
         case ("<",l:DoubleValue,r:IntValue) =>
-          _result = Some(BooleanValue(l.value < r.value))
+          _ref = Some(BooleanValue(l.value < r.value))
 
         case (">",l:IntValue,r:IntValue) =>
-          _result = Some(BooleanValue(l.value > r.value))
+          _ref = Some(BooleanValue(l.value > r.value))
         case (">",l:DoubleValue,r:DoubleValue) =>
-          _result = Some(BooleanValue(l.value > r.value))
+          _ref = Some(BooleanValue(l.value > r.value))
         case (">",l:IntValue,r:DoubleValue) =>
-          _result = Some(BooleanValue(l.value > r.value))
+          _ref = Some(BooleanValue(l.value > r.value))
         case (">",l:DoubleValue,r:IntValue) =>
-          _result = Some(BooleanValue(l.value > r.value))
+          _ref = Some(BooleanValue(l.value > r.value))
 
         case ("<=",l:IntValue,r:IntValue) =>
-          _result = Some(BooleanValue(l.value <= r.value))
+          _ref = Some(BooleanValue(l.value <= r.value))
         case ("<=",l:DoubleValue,r:DoubleValue) =>
-          _result = Some(BooleanValue(l.value <= r.value))
+          _ref = Some(BooleanValue(l.value <= r.value))
         case ("<=",l:IntValue,r:DoubleValue) =>
-          _result = Some(BooleanValue(l.value <= r.value))
+          _ref = Some(BooleanValue(l.value <= r.value))
         case ("<=",l:DoubleValue,r:IntValue) =>
-          _result = Some(BooleanValue(l.value <= r.value))
+          _ref = Some(BooleanValue(l.value <= r.value))
 
         case (">=",l:IntValue,r:IntValue) =>
-          _result = Some(BooleanValue(l.value >= r.value))
+          _ref = Some(BooleanValue(l.value >= r.value))
         case (">=",l:DoubleValue,r:DoubleValue) =>
-          _result = Some(BooleanValue(l.value >= r.value))
+          _ref = Some(BooleanValue(l.value >= r.value))
         case (">=",l:IntValue,r:DoubleValue) =>
-          _result = Some(BooleanValue(l.value >= r.value))
+          _ref = Some(BooleanValue(l.value >= r.value))
         case (">=",l:DoubleValue,r:IntValue) =>
-          _result = Some(BooleanValue(l.value >= r.value))
+          _ref = Some(BooleanValue(l.value >= r.value))
 
         case ("=",l:IntValue,r:IntValue) =>
-          _result = Some(BooleanValue(l.value == r.value))
+          _ref = Some(BooleanValue(l.value == r.value))
         case ("=",l:DoubleValue,r:DoubleValue) =>
-          _result = Some(BooleanValue(l.value == r.value))
+          _ref = Some(BooleanValue(l.value == r.value))
         case ("=",l:IntValue,r:DoubleValue) =>
-          _result = Some(BooleanValue(l.value == r.value))
+          _ref = Some(BooleanValue(l.value == r.value))
         case ("=",l:DoubleValue,r:IntValue) =>
-          _result = Some(BooleanValue(l.value == r.value))
+          _ref = Some(BooleanValue(l.value == r.value))
 
         case ("!=",l:IntValue,r:IntValue) =>
-          _result = Some(BooleanValue(l.value != r.value))
+          _ref = Some(BooleanValue(l.value != r.value))
         case ("!=",l:DoubleValue,r:DoubleValue) =>
-          _result = Some(BooleanValue(l.value != r.value))
+          _ref = Some(BooleanValue(l.value != r.value))
         case ("!=",l:IntValue,r:DoubleValue) =>
-          _result = Some(BooleanValue(l.value != r.value))
+          _ref = Some(BooleanValue(l.value != r.value))
         case ("!=",l:DoubleValue,r:IntValue) =>
-          _result = Some(BooleanValue(l.value != r.value))
+          _ref = Some(BooleanValue(l.value != r.value))
 
 
         case ("&&",l:BooleanValue,r:BooleanValue) =>
-          _result = Some(BooleanValue(l.f && r.f))
+          _ref = Some(BooleanValue(l.f && r.f))
         case ("||",l:BooleanValue,r:BooleanValue) =>
-          _result = Some(BooleanValue(l.f || r.f))
+          _ref = Some(BooleanValue(l.f || r.f))
         case ("!",l:BooleanValue,_) =>
-          _result = Some(BooleanValue(!l.f))
+          _ref = Some(BooleanValue(!l.f))
 
         case _ =>
           throw new RuntimeException(s"Invalid operator between the types:$op")
@@ -451,21 +825,49 @@ case class BooleanExpressionValue(op:String,left:Value,right:Value) extends Valu
     }
     this
   }
-  override def asValue: Value =
-    _result.getOrElse(this.eval.asValue)
-  override def spannerType: Type = _result.map(_.spannerType).orNull
-  override def setTo(m: Mutation.WriteBuilder, key: String): Unit = {
-    this.eval.asValue.setTo(m,key)
+//  override def asValue: Value =
+//    _ref.getOrElse(this.eval.asValue)
+//  override def spannerType: Type = _ref.map(_.spannerType).orNull
+//  override def setTo(m: Mutation.WriteBuilder, key: String): Unit = {
+//    this.eval.asValue.setTo(m,key)
+//  }
+
+  override def invalidateEvaluatedValueIfContains(values:List[Value]):Boolean = {
+    if ((if (left != null) left.invalidateEvaluatedValueIfContains(values) else false) ||
+      (if (right != null) right.invalidateEvaluatedValueIfContains(values) else false)) {
+      _ref = None
+      true
+    } else false
+  }
+
+  override def resolveReference(columns:Map[String,TableColumnValue]): Map[String,TableColumnValue] = {
+    val lc = if (left != null) left.resolveReference(columns) else columns
+    if (right != null) right.resolveReference(lc) else lc
   }
 }
 
-case class SubqueryValue(nat:Nat,subquery:String) extends Value {
+case class CastValue(expression:Value,toType:Type) extends Value {
+  override def text: String = s"CAST(${expression.text} AS $toType)"
+  override def eval: Value = throw new RuntimeException("Cast expression is not supported yet")
+  override def resolveReference(columns:Map[String,TableColumnValue]): Map[String,TableColumnValue] = {
+    expression.resolveReference(columns)
+  }
+}
+
+/**
+  *
+  * @param nat A Nat instance
+  * @param subquery a subquery
+  * @param qc a query context
+  */
+case class SubqueryValue(nat:Nat,subquery:String,qc:QueryContext,expectedColumns:Int = 0) extends Value {
   import Bolt._
 
   private var _result:Option[List[Struct]] = None
   private var _isArray = false
   private var _numColumns = 0
   private var _arrayType:Type = null
+  private var _aliases = Map.empty[String,QueryResultAlias]
 
   override def text = subquery
 
@@ -518,18 +920,20 @@ case class SubqueryValue(nat:Nat,subquery:String) extends Value {
         true
       case v if v == Type.array(Type.date()) =>
         true
+      case v if v == Type.array(Type.bytes()) =>
+        true
       case _ =>
         false
     }
 
   private def _equalsAllColumnType(st:Struct):Boolean = {
-    val c = st.getColumnCount
-    _numColumns = c
-    if (c > 0) {
+//    val c = st.getColumnCount
+//    _numColumns = c
+    if (_numColumns > 0) {
       val t = st.getColumnType(0)
       _arrayType = t
       _isArray = _isArrayType(t)
-      (1 until c).forall(st.getColumnType(_) == t)
+      (1 until _numColumns).forall(st.getColumnType(_) == t)
     } else { true }
   }
 
@@ -537,14 +941,18 @@ case class SubqueryValue(nat:Nat,subquery:String) extends Value {
     if (_result.isEmpty) {
       val r = nat.executeNativeQuery(subquery).autoclose(
         _.map(_.getCurrentRowAsStruct).toList)
-      if (r.length > 1 && _numColumns > 1)
-        throw new RuntimeException(s"The subquery has multi rows:$subquery")
-
-      r.headOption.foreach(
-        row =>
-          if (!_equalsAllColumnType(row))
-            throw new RuntimeException
-      )
+      r.headOption.foreach {
+        st =>
+          _numColumns = st.getColumnCount
+      }
+//      if (r.length > 1 && _numColumns > 1)
+//        throw new RuntimeException(s"The subquery has multi rows:$subquery")
+//
+//      r.headOption.foreach(
+//        row =>
+//          if (!_equalsAllColumnType(row))
+//            throw new RuntimeException
+//      )
       _result = Some(r)
     }
     this
@@ -568,7 +976,15 @@ case class SubqueryValue(nat:Nat,subquery:String) extends Value {
   }
 
   override def asArray:ArrayValue = {
+    this.eval
+
     val r = _result.get
+
+    r.headOption.foreach(
+      row =>
+        if (!_equalsAllColumnType(row))
+          throw new RuntimeException("The subquery columns are not single type")
+    )
 
     (r.length, _numColumns) match {
       case (_, 0) | (0, _) =>
@@ -597,4 +1013,37 @@ case class SubqueryValue(nat:Nat,subquery:String) extends Value {
   override def setTo(m: Mutation.WriteBuilder, key: String): Unit = {
     this.eval.asValue.setTo(m,key)
   }
+
+  def setAlias(aliases:Map[String,QueryResultAlias]):Unit =
+    _aliases = aliases
+
+  override def getField(fieldIdx: Int): Value = {
+    this.eval
+    val l = if (_numColumns == 0) expectedColumns else _numColumns
+    if (fieldIdx < 0 || l <= fieldIdx)
+      throw new RuntimeException("Field index is out of range")
+    _result.get.headOption.map {
+      row =>
+        _getColumn(row, fieldIdx)
+    }.getOrElse(NullValue)
+  }
+
+  override def getField(fieldName: String): Value = {
+    this.eval
+    val r = _result.get
+    r.headOption match {
+      case Some(st) =>
+        try {
+          _getColumn(st,st.getColumnIndex(fieldName))
+        } catch {
+          case _ : IllegalArgumentException =>
+            throw new RuntimeException(s"Invalid column name '$fieldName'")
+        }
+
+      case None =>
+        NullValue   // TODO: Check
+    }
+  }
+
+  def numRows:Int = _result.map(_.length).getOrElse(0)
 }

@@ -39,12 +39,12 @@ class MiniSqlParserTest extends Specification {
 
     override def delete(tableName: String, where: Where): Unit = {
       where match {
-        case NormalWhere(w) =>
+        case NormalWhere(w,_) =>
           queryString = w
       }
     }
 
-    override def update(tableName: String, keysAndValues: util.List[KeyValue], where: Where): Unit = {
+    override def update(tableName: String, keysAndValues: util.List[KeyValue], where: NormalWhere): Unit = {
       queryString = keysAndValues.get(0).value.eval.asValue.text
     }
 
@@ -421,8 +421,7 @@ class MiniSqlParserTest extends Specification {
     "SELECT FirstName AS name, LastName AS name,\nFROM Singers\nGROUP BY name" in {
       val sql = "SELECT FirstName AS name, LastName AS name FROM Singers GROUP BY name"
       val (parser, nat) = _createParser(sql)
-      parser.minisql()
-      nat.queryString must_== sql
+      parser.minisql() must throwA[RuntimeException] // duplicate alias
     }
     "SELECT UPPER(LastName) AS LastName\nFROM Singers\nGROUP BY LastName" in {
       val sql = "SELECT UPPER(LastName) AS LastName FROM Singers GROUP BY LastName"
@@ -431,6 +430,7 @@ class MiniSqlParserTest extends Specification {
       nat.queryString must_== sql
     }
     "SELECT x, z AS T\nFROM some_table T\nGROUP BY T.x" in {
+      // NOTICE: This test will occur error only after resolving references
       val sql = "SELECT x, z AS T FROM some_table T GROUP BY T.x"
       val (parser, nat) = _createParser(sql)
       parser.minisql()
@@ -667,7 +667,8 @@ class MiniSqlParserTest extends Specification {
       val sql = "insert into test_tbl values(3, IF( (select count from test_tbl where id=2) > 0, 1, 0))"
       val (parser,nat) = _createParser(sql)
       parser.minisql()
-      nat.queryString must_== "3,IF(select count from test_tbl where id=2 > 0,1,0)"
+      println(nat.queryString)
+      nat.queryString must_== "3,IF((select count from test_tbl where id=2 > 0),1,0)"
     }
   }
   "DELETE" should {

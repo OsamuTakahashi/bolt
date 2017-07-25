@@ -22,6 +22,7 @@ import org.joda.time.format.DateTimeFormat;
         return _subqueryDepth > 0;
     }
 
+    // for where clause
     private void enterSelect() {
         _subqueryDepth += 1;
     }
@@ -29,6 +30,8 @@ import org.joda.time.format.DateTimeFormat;
     private void exitSelect() {
         _subqueryDepth -= 1;
     }
+
+    QueryContext qc = null;
 }
 
 
@@ -56,22 +59,26 @@ stmt returns [ ResultSet resultSet = null ]
         | /* empty */ { $resultSet = lastResultSet; }
         ;
 
-query_stmt
+query_stmt returns [ Value v = null ]
         : table_hint_expr? join_hint_expr? query_expr
         ;
 
-query_expr
-        :  ( query_expr_elem | query_expr_elem set_op query_expr )(ORDER BY expression (ASC|DESC)? (',' expression (ASC|DESC)? )* )? ( LIMIT count ( OFFSET skip_rows )? )?
+query_expr returns [ QueryContext q = null, Value v = null, int columns = 0 ]
+        : { qc = new QueryContext(nat,qc); $q = qc; }  ( query_expr_elem { $columns = $query_expr_elem.columns; } | query_expr_elem { $columns = $query_expr_elem.columns; } set_op query_expr )(ORDER BY expression (ASC|DESC)? (',' expression (ASC|DESC)? )* )? ( LIMIT count ( OFFSET skip_rows )? )? {
+//              System.out.println("query_expr:" + $query_expr.text);
+              qc = qc.parent();
+            }
         ;
 
 
-query_expr_elem
-        : select_stmt
-        | '(' query_expr ')'
+query_expr_elem returns [ QueryContext q = null, int columns = 0 ]
+        : select_stmt { $columns = $select_stmt.idx; }
+        | '(' query_expr ')' { $columns = $query_expr.columns; }
         ;
 
-select_stmt
-        : SELECT { enterSelect(); } (ALL|DISTINCT)?  (AS STRUCT)? (MUL | expression ( AS? alias )? (',' expression ( AS? alias )? )* )
+select_stmt returns [ int idx = 0 ]
+        : SELECT { enterSelect(); } (ALL|DISTINCT)?  (AS STRUCT)?
+            (MUL | expression ( AS? alias { qc.addResultAlias(new QueryResultAlias($alias.text,$idx++,qc)); } )? (',' expression ( AS? alias { qc.addResultAlias(new QueryResultAlias($alias.text,$idx++,qc)); } )? )* )
             ( FROM from_item_with_joind (',' from_item_with_joind)* )?
             ( WHERE bool_expression )?
             ( GROUP BY expression (',' expression)* )?
@@ -86,9 +93,9 @@ from_item_with_joind
         ;
 
 from_item
-        : table_name (table_hint_expr )? (AS? alias)?
-        | '(' query_expr ')' table_hint_expr? (AS? alias)?
-        | field_path (AS? alias)?
+        : table_name (table_hint_expr )? (AS? alias { qc.addAlias(new TableAlias($alias.text, $table_name.text)); })?
+        | '(' query_expr ')' table_hint_expr? (AS? alias { qc.addAlias(new ExpressionAlias($alias.text,$query_expr.v)); })?
+        | field_path (AS? alias { qc.addAlias(new ExpressionAlias($alias.text,$field_path.v)); })?
         | ( UNNEST '(' array_expression? ')' | UNNEST '(' array_path ')' | array_path ) table_hint_expr? (AS? alias)? (WITH OFFSET (AS? alias)? )?
         | '(' from_item_with_joind ')'
         ;
@@ -97,11 +104,15 @@ table_hint_expr
         : '@' '{' table_hint_key '=' table_hint_value '}'
         ;
 
-table_name
-        : ID
+table_name returns [ String text = null ]
+        : ID {
+//            qc.setCurrentTable($ID.text);
+            $text = $ID.text;
+          }
         ;
 
-alias   : ID
+alias returns [ String text = null; ]
+        : ID { $text = $ID.text; }
         ;
 
 count   : INT_VAL
@@ -111,8 +122,9 @@ skip_rows
         : INT_VAL
         ;
 
-field_path
-        : ID (DOT ID)+
+field_path returns [ Value v = null ]
+        locals [ List<String> fields= new ArrayList<String>(); ]
+        : i=ID (DOT ID { $fields.add($ID.text); })+ { $v = new IdentifierWithFieldValue($i.text,$fields,qc); }
         ;
 
 table_hint_key
@@ -166,19 +178,19 @@ unary_expr returns [ Value v = null ]
         ;
 
 atom returns [ Value v = null ]
-        : ID
-        | field_path
+        : ID { $v = new IdentifierValue($ID.text,qc); }
+        | field_path { $v = $field_path.v; }
         | scalar_value { $v = $scalar_value.v; }
         | struct_value { $v = $struct_value.v; }
         | array_expression { $v = $array_expression.v; }
-        | cast_expression
+        | cast_expression  { $v = $cast_expression.v; }
         | '(' expression ')' { $v = $expression.v; }
-        | '(' query_expr ')' { $v = new SubqueryValue(nat,$query_expr.text); }
+        | '(' query_expr')' { $v = new SubqueryValue(nat,$query_expr.text,$query_expr.q,$query_expr.columns);$query_expr.q.setSubquery((SubqueryValue)$v); }
         ;
 
 array_path returns [ Value v = null ]
         locals [ Value arr = null ]
-        :  (ID|field_path|array_expression { $arr = $array_expression.v; }) '['
+        :  (ID { $arr = new IdentifierValue($ID.text,qc); }|field_path { $arr = $field_path.v; }|array_expression { $arr = $array_expression.v; }) '['
             (OFFSET '(' expression ')' {
               if ($arr == null || $expression.v == null) {
                 $v = NullValue$.MODULE$;
@@ -213,8 +225,8 @@ bool_expression returns [ Value v = null ]
         | bit_or_expr NOT? IN ( array_expression | '(' query_expr ')' | UNNEST '(' array_expression ')' )
         | bool_value { $v = $bool_value.v; }
         | function { $v = $function.v; }
-        | ID
-        | field_path
+        | ID { $v = new IdentifierValue($ID.text,qc); }
+        | field_path { $v = $field_path.v; }
         ;
 
 array_expression
@@ -224,17 +236,19 @@ array_expression
             Boolean f = $arrayType != null;
             $v = new ArrayValue($valueList,f,f ? $arrayType : null);
           }
-        | ARRAY '(' query_stmt ')' {
+        | ARRAY '(' query_expr ')' {
             List<Value> p = new ArrayList<Value>();
-            p.add(new SubqueryValue(nat,$query_stmt.text));
+            p.add(new SubqueryValue(nat,$query_expr.text,$query_expr.q,$query_expr.columns));
+//            $query_expr.q.setSubquery($v);
             $v = new FunctionValue("\$ARRAY",p);
           }
-        | ID
-        | field_path
+        | ID { $v = new IdentifierValue($ID.text,qc); }
+        | field_path { $v = $field_path.v; }
         ;
 
 cast_expression
-        : CAST '(' expression AS type ')'
+        returns [ Value v = null ]
+        : CAST '(' expression AS type ')' { $v = new CastValue($expression.v, $type.tp); }
         ;
 
 column_name
@@ -275,19 +289,21 @@ insert_stmt returns [ ResultSet resultSet = null ]
               List<String> columns = new ArrayList<String>(),
               List< List<Value> > bulkValues = new ArrayList<List<Value>>()
             ]
-        : INSERT INTO? tbl=ID (AS? alias)? ( '(' ID { $columns.add($ID.text); } (',' ID { $columns.add($ID.text); } )*  ')' )?
+        : INSERT { qc = new QueryContext(nat,qc); } INTO? tbl=ID (AS? alias)? ( '(' ID { $columns.add($ID.text); } (',' ID { $columns.add($ID.text); } )*  ')' )?
             VALUES values {
               if ($columns.size() == 0)
                 nat.insert($tbl.text,$values.valueList);
               else
                 nat.insert($tbl.text,$columns,$values.valueList);
+              qc = qc.parent();
             }
-        | INSERT INTO? tbl=ID (AS? alias)? ( '(' ID { $columns.add($ID.text); } (',' ID { $columns.add($ID.text); } )*  ')' )?
+        | INSERT { ;qc = new QueryContext(nat,qc); } INTO? tbl=ID (AS? alias)? ( '(' ID { $columns.add($ID.text); } (',' ID { $columns.add($ID.text); } )*  ')' )?
             VALUES values { $bulkValues.add($values.valueList); } (',' values { $bulkValues.add($values.valueList); }) + {
               if ($columns.size() == 0)
                 nat.bulkInsert($tbl.text,$bulkValues);
               else
                 nat.bulkInsert($tbl.text,$columns,$bulkValues);
+              qc = qc.parent();
             }
         ;
 
@@ -296,10 +312,10 @@ update_stmt
             locals [
               List<KeyValue> kvs = new ArrayList<KeyValue>()
             ]
-        : UPDATE ID { currentTable = $ID.text; } (AS? alias)?
+        : UPDATE { qc = new QueryContext(nat,qc); } table_name { currentTable = $table_name.text; } (AS? alias { qc.addAlias(new TableAlias($alias.text,$table_name.text)); })?
             SET ID EQ expression { $kvs.add(new KeyValue($ID.text,$expression.v)); } ( ',' ID EQ expression { $kvs.add(new KeyValue($ID.text,$expression.v)); } )*
             where_stmt ( LIMIT ln=INT_VAL )? {
-              if ($where_stmt.where != null && $where_stmt.where.onlyPrimaryKey()) {
+              /*if ($where_stmt.where != null && $where_stmt.where.onlyPrimaryKey()) {
                 nat.update(currentTable,$kvs,$where_stmt.where);
               } else {
                 NormalWhere w = new NormalWhere($where_stmt.text);
@@ -307,14 +323,17 @@ update_stmt
                   w = new NormalWhere(w.whereStmt() + " LIMIT " + $ln.text);
                 }
                 nat.update(currentTable,$kvs,w);
-              }
+              }*/
+              nat.update(currentTable,$kvs,$where_stmt.where);
+              qc = qc.parent();
             }
         ;
 
 delete_stmt returns [ ResultSet resultSet = null ]
             locals [ Where where = null ]
-        : DELETE FROM ID { currentTable = $ID.text; } (where_stmt { $where = ($where_stmt.where == null) ? new NormalWhere($where_stmt.text) : $where_stmt.where; })? {
+        : DELETE { qc = new QueryContext(nat,qc); } FROM ID { currentTable = $ID.text; } (where_stmt { $where = /*($where_stmt.where == null) ? new NormalWhere($where_stmt.text) :*/ $where_stmt.where; })? {
             nat.delete(currentTable,$where);
+            qc = qc.parent();
           }
         ;
 
@@ -369,8 +388,9 @@ key_part: ID (ASC | DESC)?
 cluster : INTERLEAVE IN PARENT ID ( ON DELETE ( CASCADE | NO ACTION ) )?
         ;
 
-type    : scalar_type
-        | array_type
+type    returns [ Type tp = null ]
+        : scalar_type { $tp = $scalar_type.tp; }
+        | array_type { $tp = $array_type.tp; }
         ;
 
 scalar_type returns [ Type tp = null ]
@@ -387,8 +407,8 @@ length  : INT_VAL
         | MAX
         ;
 
-array_type
-        : ARRAY '<' scalar_type '>'
+array_type returns [ Type tp = null ]
+        : ARRAY '<' scalar_type '>' { $tp = Type.array( $scalar_type.tp ); }
         ;
 
 create_index returns [ String indexName = null, String tableName = null ]
@@ -414,7 +434,7 @@ table_alteration
         | SET ON DELETE (CASCADE| NO ACTION)
         ;
 
-drop_stmt /* throws NativeSqlException */
+drop_stmt
         : DROP TABLE ID
         | DROP INDEX ID
         ;
@@ -437,12 +457,12 @@ show_stmt returns [ ResultSet resultSet = null ]
         | SHOW INDEX (FROM|IN) ID { $resultSet = nat.showIndexes($ID.text); }
         ;
 
-value returns [ Value v = null ]
-        : scalar_value { $v = $scalar_value.v; }
-        | array_expression { $v = $array_expression.v; }
-        | struct_value
-        | /* empty */ { $v = NullValue$.MODULE$; }
-        ;
+//value returns [ Value v = null ]
+//        : scalar_value { $v = $scalar_value.v; }
+//        | array_expression { $v = $array_expression.v; }
+//        | struct_value { $v = $struct_value.v; }
+//        | /* empty */ { $v = NullValue$.MODULE$; }
+//        ;
 
 scalar_value  returns [ Value v = null ]
         : scalar_literal { $v = $scalar_literal.v; }
@@ -472,7 +492,8 @@ null_value returns [ Value v = null ]
         ;
 
 struct_value returns [ StructValue v = null; ]
-        : STRUCT /*{ if (!insideSelect()) $v = new StructValue(); }*/ '(' expression (AS? ID)? { /*$v.addValue($expression.v);*/ } (',' expression (AS? ID)? { /*$v.addValue($expression.v);*/ })* ')'
+        locals [ int idx = 0 ]
+        : STRUCT { $v = new StructValue(); } '(' expression { $v.addValue($expression.v);} (AS? alias { $v.addFieldName($alias.text,$idx); })?  { $idx++; } (',' expression { $v.addValue($expression.v); } (AS? alias { $v.addFieldName($alias.text,$idx); } )? { $idx++; } )* ')'
         ;
 
 function returns [ Value v = null ]
@@ -482,8 +503,8 @@ function returns [ Value v = null ]
           }
         ;
 
-where_stmt returns [ Where where = null ] locals [ List<WhereCondition> conds = new ArrayList<WhereCondition>() ]
-        : WHERE ID EQ value {
+where_stmt returns [ NormalWhere where = null,Value v = null ] locals [ List<WhereCondition> conds = new ArrayList<WhereCondition>() ]
+        : /*WHERE ID EQ value {
             if (!insideSelect() && nat.isKey(currentTable,$ID.text)) {
               $where = new PrimaryKeyWhere($ID.text,$value.v.text());
             }
@@ -493,7 +514,7 @@ where_stmt returns [ Where where = null ] locals [ List<WhereCondition> conds = 
               $where = new PrimaryKeyListWhere($ID.text,$values.valueList);
             }
           }
-        | WHERE bool_expression
+        | */WHERE bool_expression { $v = $bool_expression.v; $where = new NormalWhere("WHERE " + $bool_expression.text,$v); }
         ;
 
 values returns [ List<Value> valueList = new ArrayList<Value>() ]

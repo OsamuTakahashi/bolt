@@ -39,6 +39,8 @@ object Bolt {
 
     def transactionContext = _transactionContext
 
+    def database = Database(dbClient)
+
     /**
       * Executing INSERT/UPDATE/DELETE query on Google Cloud Spanner
       * @param srcSql sql statements
@@ -65,7 +67,7 @@ object Bolt {
             parser.minisql().resultSet.close()
           throw e
       }
-    } //.lastOption.orNull
+    }
 
     def executeQuery(sql:String): ResultSet = executeQuery(sql,null,null)
 
@@ -73,32 +75,23 @@ object Bolt {
       * Internal use
       */
     def isKey(tableName:String,columnName:String):Boolean =
-      Database(dbClient).table(tableName).get.isKey(columnName)
+      Database(dbClient).table(tableName).get.primaryKey.equalKeys(List(columnName)) // !! TEMPORARY !!
 
     /**
       * Internal use
       */
     def insert(tableName:String,values:java.util.List[Value]):Unit = {
       val m = Mutation.newInsertBuilder(tableName)
-      val columns = Database(dbClient).table(tableName) match {
+      val columns = database.table(tableName) match {
         case Some(tbl) =>
           tbl.columns
         case None =>
           throw new RuntimeException(s"Table not found $tableName")
       }
-//      val evs = values.map(_.eval.asValue)
       columns.zip(values).foreach {
         case (k,v) =>
           v.setTo(m,k.name)
       }
-
-//      columns.zip(evs).foreach {
-//        case (k, NullValue) =>
-//        case (k, ArrayValue(v,_,_)) =>
-//          m.set(k.name).toStringArray(v.map(_.text))
-//        case (k, v) =>
-//          m.set(k.name).to(v.text)
-//      }
       _transactionContext match {
         case Some(_) =>
           _mutations ++= List(m.build())
@@ -113,15 +106,6 @@ object Bolt {
         case (k,v) =>
           v.setTo(m,k)
       }
-//      val evs = values.map(_.eval.asValue)
-//
-//      columns.zip(evs).foreach {
-//        case (k, NullValue) =>
-//        case (k, ArrayValue(v,_,_)) =>
-//          m.set(k).toStringArray(v.map(_.text))
-//        case (k, v) =>
-//          m.set(k).to(v.text)
-//      }
       _transactionContext match {
         case Some(_) =>
           _mutations ++= List(m.build())
@@ -138,14 +122,6 @@ object Bolt {
             case (k,vv) =>
               vv.setTo(m,k)
           }
-//          val evs = v.map(_.eval.asValue)
-//          columns.zip(evs).foreach {
-//            case (k, NullValue) =>
-//            case (k, ArrayValue(v,_,_)) =>
-//              m.set(k).toStringArray(v.map(_.text))
-//            case (k, v) =>
-//              m.set(k).to(v.text)
-//          }
           m.build()
       }
 
@@ -159,7 +135,7 @@ object Bolt {
 
     def bulkInsert(tableName:String,values:java.util.List[java.util.List[Value]]):Unit = {
       val m = Mutation.newInsertBuilder(tableName)
-      val columns = Database(dbClient).table(tableName) match {
+      val columns = database.table(tableName) match {
         case Some(tbl) =>
           tbl.columns
         case None =>
@@ -172,14 +148,6 @@ object Bolt {
             case (k,vv) =>
               vv.setTo(m,k.name)
           }
-//          val evs = v.map(_.eval.asValue)
-//          columns.zip(evs).foreach {
-//            case (k, NullValue) =>
-//            case (k, ArrayValue(v,_,_)) =>
-//              m.set(k.name).toStringArray(v.map(_.text))
-//            case (k, v) =>
-//              m.set(k.name).to(v.text)
-//          }
           m.build()
       }
 
@@ -210,36 +178,102 @@ object Bolt {
       }
     }
 
-    // TODO: add left types
-    private def _getTargetKeys(transaction: TransactionContext,tableName:String,where:String):List[String] = {
-      val tbl = Database(dbClient).table(tableName).get
-      val key = tbl.key
-      val resSet = transaction.executeQuery(Statement.of(s"SELECT $key FROM $tableName $where"))
-      var keys = List.empty[String]
+    private def _getTargetKeys(transaction: TransactionContext,tableName:String,where:String):List[List[String]] = {
+      val tbl = database.table(tableName).get
+      val keyNames = tbl.primaryKey.columns.map(_.name)
+      val resSet = transaction.executeQuery(Statement.of(s"SELECT ${keyNames.mkString(",")} FROM $tableName $where"))
+      val reader = new ColumnReader {}
 
-      tbl.columnTypeOf(key) match {
-        case Some("INT64") =>
-          while(resSet.next()) {
-            keys ::= resSet.getLong(key).toString
-          }
-        case Some("STRING") =>
-          while(resSet.next()) {
-            keys ::= resSet.getString(key)
-          }
-        case Some("FLOAT64") =>
-          while(resSet.next()) {
-            keys ::= resSet.getDouble(key).toString
-          }
-        case _ =>
+      resSet.autoclose {
+        res =>
+          res.map {
+            row =>
+              (0 until row.getColumnCount).map(i=>reader.getColumn(row,i).text).toList
+          }.toList
       }
-      keys.reverse
     }
-    
+
+    private def _getTargetKeysAndValues(transaction: TransactionContext,
+                                        tbl:Table,
+                                        where:String,
+                                        usedColumns:List[TableColumnValue]):(List[TableColumnValue],List[List[Value]]) = {
+      val keyNames = tbl.primaryKey.columns.filter(col=> !usedColumns.exists(_.name == col.name)).map(col => TableColumnValue(col.name,tbl.name,col.position)) ++ usedColumns
+      val resSet = transaction.executeQuery(Statement.of(s"SELECT ${keyNames.map(_.name).mkString(",")} FROM ${tbl.name} $where"))
+      val reader = new ColumnReader {}
+
+      (keyNames,
+        resSet.autoclose {
+          res =>
+            res.map {
+              row =>
+                (0 until row.getColumnCount).map(i=>reader.getColumn(row,i)).toList
+            }.toList
+        })
+    }
+
+//    private def _preUpdateQuery(usedColumns:Map[String,TableColumnValue]):ResultSet = {
+//
+//    }
+
+    private def _composeUpdateMutations(tr:TransactionContext,tableName:String,
+                                        keysAndValues:java.util.List[KeyValue],
+                                        where:NormalWhere,
+                                        usedColumns:Map[String,TableColumnValue]):List[Mutation] = {
+      val tbl = database.table(tableName).get
+      val cols = usedColumns.values.toList
+      val (keys,values) = _getTargetKeysAndValues(tr,tbl,where.whereStmt,cols)
+
+      values.map {
+        row =>
+          keys.zip(row).foreach {
+            case (k,v) =>
+              k.setValue(v)
+          }
+
+          val m = Mutation.newUpdateBuilder(tableName)
+
+          // set primary key value
+          tbl.primaryKey.columns.foreach(col => keys.find(_.name == col.name).foreach(v => v.setTo(m,v.name)))
+
+          //  
+          keysAndValues.foreach {
+            case KeyValue(k,v) =>
+              v.invalidateEvaluatedValueIfContains(cols)
+              v.eval.asValue.setTo(m,k)
+          }
+          m.build()
+      }
+    }
+
     /**
       * Internal use
       */
-    def update(tableName:String,keysAndValues:java.util.List[KeyValue],where:Where):Unit = {
-      where match {
+    def update(tableName:String,keysAndValues:java.util.List[KeyValue],where:NormalWhere):Unit = {
+      val usedColumns =
+        keysAndValues.foldLeft(Map.empty[String,TableColumnValue]) {
+          case (col,kv) =>
+            kv.value.resolveReference(col)
+        }
+
+//      if (usedColumns.nonEmpty) {
+//        // required pre query
+//      }
+
+      _transactionContext match {
+        case Some(tr) =>
+          _mutations ++= _composeUpdateMutations(tr,tableName,keysAndValues,where,usedColumns)
+
+        case None =>
+          Option(dbClient).foreach(_.readWriteTransaction()
+            .run(new TransactionCallable[Unit] {
+              override def run(transaction: TransactionContext):Unit = {
+                val ml = _composeUpdateMutations(transaction,tableName,keysAndValues,where,usedColumns)
+                if (ml.nonEmpty) transaction.buffer(ml)
+              }
+            }))
+      }
+
+      /*where match {
         case PrimaryKeyWhere(k,v) =>
           val m = Mutation.newUpdateBuilder(tableName)
           m.set(k).to(v)
@@ -247,18 +281,6 @@ object Bolt {
             case KeyValue(k,v)=>
               v.setTo(m,k)
           }
-//          val kve = keysAndValues.map {
-//            case KeyValue(k,v) =>
-//              KeyValue(k,v.eval.asValue)
-//          }
-//          kve.map(kv=>(kv.key,kv.value)).foreach {
-//            case (k, NullValue) =>
-//            case (k, ArrayValue(v,_,_)) =>
-//              m.set(k).toStringArray(v.map(_.text))
-//            case (k, v) =>
-//              m.set(k).to(v.text)
-//          }
-
           _transactionContext match {
             case Some(_) =>
               _mutations ++= List(m.build())
@@ -275,14 +297,6 @@ object Bolt {
                 case KeyValue(k,v)=>
                   v.setTo(m,k)
               }
-//              val ekv = keysAndValues.map(kv => KeyValue(kv.key,kv.value.eval.asValue))
-//              ekv.map(kv=>(kv.key,kv.value)).foreach {
-//                case (k, NullValue) =>
-//                case (k, ArrayValue(v,_,_)) =>
-//                  m.set(k).toStringArray(v.map(_.text))
-//                case (k, v) =>
-//                  m.set(k).to(v.text)
-//              }
               m.build()
           }
           _transactionContext match {
@@ -298,7 +312,7 @@ object Bolt {
             case Some(tr) =>
               val keys = _getTargetKeys(tr,tableName,w)
               if (keys.nonEmpty) {
-                val key = Database(dbClient).table(tableName).get.key
+                val key = Database(dbClient).table(tableName).get.primaryKey.columns.head.name // !! TEMPORARY !!
                 val ml = keys.map {
                   k =>
                     val m = Mutation.newUpdateBuilder(tableName)
@@ -307,14 +321,6 @@ object Bolt {
                       case KeyValue(k,v)=>
                         v.setTo(m,k)
                     }
-//                    val ekv = keysAndValues.map(kv => KeyValue(kv.key,kv.value.eval.asValue))
-//                    ekv.map(kv=>(kv.key,kv.value)).foreach {
-//                      case (k, NullValue) =>
-//                      case (k, ArrayValue(v,_,_)) =>
-//                        m.set(k).toStringArray(v.map(_.text))
-//                      case (k, v) =>
-//                        m.set(k).to(v.text)
-//                    }
                     m.build()
                 }
                 _mutations ++= ml
@@ -326,7 +332,7 @@ object Bolt {
                   override def run(transaction: TransactionContext):Unit = {
                     val keys = _getTargetKeys(transaction,tableName,w)
                     if (keys.nonEmpty) {
-                      val key = Database(dbClient).table(tableName).get.key
+                      val key = Database(dbClient).table(tableName).get.primaryKey.columns.head.name // !! TEMPROARY !!
                       val ml = keys.map {
                         k =>
                           val m = Mutation.newUpdateBuilder(tableName)
@@ -335,14 +341,6 @@ object Bolt {
                             case KeyValue(k,v)=>
                               v.setTo(m,k)
                           }
-//                          val ekv = keysAndValues.map(kv => KeyValue(kv.key,kv.value.eval.asValue))
-//                          ekv.map(kv=>(kv.key,kv.value)).foreach {
-//                            case (k, NullValue) =>
-//                            case (k, ArrayValue(v,_,_)) =>
-//                              m.set(k).toStringArray(v.map(_.text))
-//                            case (k, v) =>
-//                              m.set(k).to(v.text)
-//                          }
                           m.build()
                       }
                       transaction.buffer(ml)
@@ -350,7 +348,7 @@ object Bolt {
                   }
                 }))
           }
-      }
+      }*/
     }
 
     /**
@@ -367,7 +365,7 @@ object Bolt {
               Option(dbClient).foreach(_.write(List(m)))
           }
 
-        case Some(NormalWhere(w)) =>
+        case Some(NormalWhere(w,_)) =>
 //          _logger.info(s"Slow delete query on $tableName. Reason => $w")
           _transactionContext match {
             case Some(tr) =>
@@ -375,7 +373,7 @@ object Bolt {
               if (keys.nonEmpty) {
                 val ml = keys.map {
                   k =>
-                    Mutation.delete(tableName,Key.of(k))
+                    Mutation.delete(tableName,Key.of(k:_*))
                 }
                 _mutations ++= ml
               }
@@ -388,7 +386,7 @@ object Bolt {
                     if (keys.nonEmpty) {
                       val ml = keys.map {
                         k =>
-                          Mutation.delete(tableName,Key.of(k))
+                          Mutation.delete(tableName,Key.of(k:_*))
                       }
                       transaction.buffer(ml)
                     }

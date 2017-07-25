@@ -14,10 +14,14 @@ package com.sopranoworks.bolt
 import com.google.cloud.spanner.{DatabaseClient, Statement}
 import org.slf4j.LoggerFactory
 
+trait Database {
+  def table(name:String):Option[Table]
+}
+
 /**
   * Created by takahashi on 2017/03/28.
   */
-class Database(dbClient:DatabaseClient) {
+class DatabaseImpl(dbClient:DatabaseClient) extends Database {
   private val _logger = LoggerFactory.getLogger(this.getClass)
   private var _tables = Map.empty[String,Table]
 
@@ -49,6 +53,7 @@ class Database(dbClient:DatabaseClient) {
       }
     }
     resSet2.close()
+
     var idxForTbl = Map.empty[String,List[Index]]
     indexes.foreach(kv=>idxForTbl += kv._2._1 -> (Index(kv._1._2, kv._2._2.sortWith(_.position < _.position)) :: idxForTbl.getOrElse(kv._2._1,Nil)))
 
@@ -66,7 +71,7 @@ object Database {
   private var _databases = Map.empty[DatabaseClient,Database]
 
   def apply(dbClient:DatabaseClient):Database = _databases.getOrElse(dbClient,{
-    val db = new Database(dbClient)
+    val db = new DatabaseImpl(dbClient)
     db.loadInformationSchema()
     _databases += (dbClient->db)
     db
