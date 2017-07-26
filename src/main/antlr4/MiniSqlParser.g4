@@ -79,7 +79,7 @@ query_expr_elem returns [ QueryContext q = null, int columns = 0 ]
 
 select_stmt returns [ int idx = 0 ]
         : SELECT { enterSelect(); } (ALL|DISTINCT)?  (AS STRUCT)?
-            (MUL | expression ( AS? alias { qc.addResultAlias(new QueryResultAlias($alias.text,$idx++,qc)); } )? (',' expression ( AS? alias { qc.addResultAlias(new QueryResultAlias($alias.text,$idx++,qc)); } )? )* )
+            (MUL | expression ( AS? alias { qc.addResultAlias(new QueryResultAlias($alias.text,$idx,qc)); } )? { $idx++; } (',' expression ( AS? alias { qc.addResultAlias(new QueryResultAlias($alias.text,$idx,qc)); } )? { $idx++; } )* )
             ( FROM from_item_with_joind (',' from_item_with_joind)* )?
             ( WHERE bool_expression )?
             ( GROUP BY expression (',' expression)* )?
@@ -179,19 +179,19 @@ unary_expr returns [ Value v = null ]
         ;
 
 atom returns [ Value v = null ]
-        : ID { $v = new IdentifierValue($ID.text,qc); }
+        : ID { $v = (qc == null) ? new IdentifierValue($ID.text,qc) : qc.identifier($ID.text);  }
         | field_path { $v = $field_path.v; }
         | scalar_value { $v = $scalar_value.v; }
         | struct_value { $v = $struct_value.v; }
         | array_expression { $v = $array_expression.v; }
         | cast_expression  { $v = $cast_expression.v; }
         | '(' expression ')' { $v = $expression.v; }
-        | '(' query_expr')' { $v = new SubqueryValue(nat,$query_expr.text,$query_expr.q,$query_expr.columns);$query_expr.q.setSubquery((SubqueryValue)$v); }
+        | '(' query_expr ')' { $v = new SubqueryValue(nat,$query_expr.text,$query_expr.q,$query_expr.columns);$query_expr.q.setSubquery((SubqueryValue)$v); }
         ;
 
 array_path returns [ Value v = null ]
         locals [ Value arr = null ]
-        :  (ID { $arr = new IdentifierValue($ID.text,qc); }|field_path { $arr = $field_path.v; }|array_expression { $arr = $array_expression.v; }) '['
+        :  (ID { $arr = (qc == null) ? new IdentifierValue($ID.text,qc) : qc.identifier($ID.text); }|field_path { $arr = $field_path.v; }|array_expression { $arr = $array_expression.v; }) '['
             (OFFSET '(' expression ')' {
               if ($arr == null || $expression.v == null) {
                 $v = NullValue$.MODULE$;
@@ -320,7 +320,7 @@ update_stmt
               List<KeyValue> kvs = new ArrayList<KeyValue>(),
               List<String> columns = new ArrayList<String>()
             ]
-        : UPDATE { qc = new QueryContext(nat,qc); } table_name { currentTable = $table_name.text; } (AS? alias { qc.addAlias(new TableAlias($alias.text,$table_name.text)); })?
+        : UPDATE { qc = new QueryContext(nat,qc); } table_name { currentTable = $table_name.text;qc.setCurrentTable($table_name.text); } (AS? alias { qc.addAlias(new TableAlias($alias.text,$table_name.text)); })?
             SET ID EQ expression { $kvs.add(new KeyValue($ID.text,$expression.v)); } ( ',' ID EQ expression { $kvs.add(new KeyValue($ID.text,$expression.v)); } )*
             where_stmt ( LIMIT ln=INT_VAL )? {
               nat.update(currentTable,$kvs,$where_stmt.where);

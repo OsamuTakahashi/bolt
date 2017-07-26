@@ -231,6 +231,36 @@ class NatTest extends Specification with BeforeAfterEach {
           res.getString(0) must_== "from"
       }
     }
+    "update with self column" in {
+      val sql =
+        """
+          |INSERT INTO TEST_ITEMS VALUES(0,0,0,1);
+          |UPDATE TEST_ITEMS SET count = count + 1 WHERE id=0;
+          |SELECT * from TEST_ITEMS WHERE id=0;
+        """.stripMargin
+
+      val resSet = _dbClient.get.executeQuery(sql)
+      resSet.autoclose {
+        res =>
+          res.next()
+          res.getLong("count") must_== 2
+      }
+    }
+    "update with self column 2" in {
+      val sql =
+        """
+          |INSERT INTO TEST_ITEMS VALUES(0,0,0,1);
+          |UPDATE TEST_ITEMS SET count = count + count + 1 WHERE id=0;
+          |SELECT * from TEST_ITEMS WHERE id=0;
+        """.stripMargin
+
+      val resSet = _dbClient.get.executeQuery(sql)
+      resSet.autoclose {
+        res =>
+          res.next()
+          res.getLong("count") must_== 3
+      }
+    }
   }
   "DELETE" should {
     "multiple rows" in {

@@ -41,6 +41,7 @@ trait Value {
     throw new RuntimeException("The value is not storable")
   }
 
+  def apply():Value = this
 //  def contains()
 
   def resolveReference(columns:Map[String,TableColumnValue] = Map.empty[String,TableColumnValue]):Map[String,TableColumnValue] = columns
@@ -64,16 +65,13 @@ trait WrappedValue extends Value {
       case None => false
     }
   }
-  
-//  override def resetEavaluation: Value = {
-//    _ref = None
-//    this
-//  }
+
+  override def apply():Value = _ref.map(_.apply()).getOrElse(this)
   
   override def setTo(m: Mutation.WriteBuilder, key: String): Unit =
     _ref match {
       case Some(v) =>
-        v.eval.setTo(m,key)
+        v.eval.asValue.setTo(m,key)
       case None =>
         super.setTo(m,key)
     }
@@ -291,6 +289,16 @@ case class IdentifierValue(name:String,qc:QueryContext) extends WrappedValue {
     }
     this
   }
+
+  override def asValue: Value = {
+    this.eval
+    if (_ref.isEmpty) {
+      this.resolveReference(Map())
+      if (_ref.isEmpty)
+        throw new RuntimeException(s"Unresolvable identifier $name")
+    }
+    _ref.get.eval.asValue
+  }
 }
 
 /**
@@ -364,22 +372,26 @@ case class TableColumnValue(name:String,tableName:String,index:Int) extends Wrap
       case Some(v) => v
       case None =>
         this
-//        throw new RuntimeException("Table alias is not able tob used in expression")
     }
-
-  override def invalidateEvaluatedValueIfContains(values:List[Value]):Boolean = {
-    if (values.contains(this)) {
-      _ref = None
-      true
-    } else {
-      false
-    }
-  }
-  
 
   override def resolveReference(columns: Map[String,TableColumnValue] = Map.empty[String,TableColumnValue]): Map[String,TableColumnValue] = {
     val key = s"$tableName.$name"
     if (!columns.contains(key)) columns + (key->this) else columns
+  }
+
+
+  override def invalidateEvaluatedValueIfContains(values: List[Value]): Boolean = {
+    values.contains(this)
+  }
+
+  override def asValue: Value = {
+    this.eval
+    if (_ref.isEmpty) {
+      this.resolveReference(Map())
+      if (_ref.isEmpty)
+        throw new RuntimeException(s"Unresolvable table column identifier $name")
+    }
+    _ref.get.eval.asValue
   }
 }
 
@@ -410,8 +422,6 @@ case class ResultFieldValue(value:Value, fieldName:String) extends WrappedValue 
   *
   */
 case class FunctionValue(name:String,parameters:java.util.List[Value]) extends WrappedValue {
-//  private var _ref:Option[Value] = None
-//  override def spannerType: Type = _ref.map(_.spannerType).orNull
 
   override def text = s"$name(${parameters.map(_.text).mkString(",")})"
   override def eval: Value = {
@@ -713,19 +723,12 @@ case class ExpressionValue(op:String,left:Value,right:Value) extends WrappedValu
           val res = l.value ^ r.value
           _ref = Some(IntValue(res.toString,res,true))
 
-        case _ =>
-          throw new RuntimeException(s"Invalid operator between the types:$op")
+        case (_,l,r) =>
+          throw new RuntimeException(s"Invalid operator between the types:$l $op $r")
       }
     }
     this
   }
-
-//  override def asValue: Value =
-//    _ref.getOrElse(this.eval.asValue)
-//  override def spannerType: Type = _ref.map(_.spannerType).orNull
-//  override def setTo(m: Mutation.WriteBuilder, key: String): Unit = {
-//    this.eval.asValue.setTo(m,key)
-//  }
 
   override def invalidateEvaluatedValueIfContains(values:List[Value]):Boolean = {
     if ((if (left != null) left.invalidateEvaluatedValueIfContains(values) else false) ||
@@ -749,9 +752,7 @@ case class ExpressionValue(op:String,left:Value,right:Value) extends WrappedValu
   * @param right right expression value
   */
 case class BooleanExpressionValue(op:String,left:Value,right:Value) extends WrappedValue {
-//  private var _ref:Option[Value] = None
   override def text = s"(${left.text} $op ${right.text})"
-//  override def isExpression: Boolean = true
   override def isBoolean:Boolean = true
 
   override def eval: Value = {
@@ -825,13 +826,6 @@ case class BooleanExpressionValue(op:String,left:Value,right:Value) extends Wrap
     }
     this
   }
-//  override def asValue: Value =
-//    _ref.getOrElse(this.eval.asValue)
-//  override def spannerType: Type = _ref.map(_.spannerType).orNull
-//  override def setTo(m: Mutation.WriteBuilder, key: String): Unit = {
-//    this.eval.asValue.setTo(m,key)
-//  }
-
   override def invalidateEvaluatedValueIfContains(values:List[Value]):Boolean = {
     if ((if (left != null) left.invalidateEvaluatedValueIfContains(values) else false) ||
       (if (right != null) right.invalidateEvaluatedValueIfContains(values) else false)) {

@@ -82,8 +82,32 @@ class IdentifierValueTest extends Specification {
 
       val v = IdentifierValue("x",qc)
       v.resolveReference()
-      v.asValue.isInstanceOf[TableColumnValue] must_== true
-      v.asValue.asInstanceOf[TableColumnValue].text must_== "TEST_TABLE.x"
+      v().isInstanceOf[TableColumnValue] must_== true
+      v().asInstanceOf[TableColumnValue].text must_== "TEST_TABLE.x"
+    }
+    "are table column names" in {
+      val tbl = Table(null,"TEST_TABLE",
+        List(Column("x",0,"INT64",false),Column("y",1,"INT64",false),Column("y",2,"INT64",false)),
+        Index("PRIMARY_KEY",List(IndexColumn("x",0,"INT64",false,"ASC"))),
+        Map.empty[String,Index])
+      val nat = new DummyNat
+      nat.database.asInstanceOf[DummyDatabase].tables += ("TEST_TABLE"->tbl)
+      val qc = QueryContext(nat,null)
+      qc.setCurrentTable("TEST_TABLE")
+
+      val v1 = IdentifierValue("x",qc)
+      val v2 = IdentifierValue("x",qc)
+      val r1 = v1.resolveReference()
+      val r2 = v2.resolveReference(r1)
+
+      r2.size must_== 1
+
+      r2.values.head.setValue(IntValue(1))
+
+      v1.asValue.isInstanceOf[IntValue] must_== true
+      v1.asValue.asInstanceOf[IntValue].value must_== 1
+      v2.asValue.isInstanceOf[IntValue] must_== true
+      v2.asValue.asInstanceOf[IntValue].value must_== 1
     }
     "is table name" in {
       val tbl = Table(null,"TEST_TABLE",

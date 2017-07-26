@@ -42,9 +42,8 @@ class IdentifierWithFieldValueTest extends Specification {
 
       val v = IdentifierWithFieldValue("TEST_TABLE",List("x"),qc)
       v.resolveReference()
-      println(v.eval.asValue)
-      v.eval.asValue.isInstanceOf[TableColumnValue] must_== true
-      v.asValue.asInstanceOf[TableColumnValue].text must_== "TEST_TABLE.x"
+      v.eval.apply().isInstanceOf[TableColumnValue] must_== true
+      v().asInstanceOf[TableColumnValue].text must_== "TEST_TABLE.x"
     }
     "subquery field name" in {
       val nat = new DummyNat

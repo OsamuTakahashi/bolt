@@ -18,6 +18,7 @@ case class QueryContext(nat:Nat,parent:QueryContext) {
   private var _resultAliases = Map.empty[String,QueryResultAlias]
   private var _currentTableName:Option[String] = None
   private var _currentTable:Option[Table] = None
+  private var _identifiers = Map.empty[String,IdentifierValue]
 
   private var _subquery:Option[SubqueryValue] = None
 
@@ -42,4 +43,11 @@ case class QueryContext(nat:Nat,parent:QueryContext) {
     
   }
   def subquery = _subquery
+
+  def identifier(name:String):IdentifierValue =
+    _identifiers.getOrElse(name, {
+      val idt = IdentifierValue(name, this)
+      _identifiers += (name -> idt)
+      idt
+    })
 }

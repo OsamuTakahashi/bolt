@@ -25,7 +25,15 @@ import scala.collection.JavaConversions._
   * Created by takahashi on 2017/07/17.
   */
 class MiniSqlParserTest extends Specification {
+  class DummyDatabase extends Database {
+    var tables = Map.empty[String,Table]
+    override def table(name: String): Option[Table] = tables.get(name)
+  }
+  
   class DummyNat(dbClient:DatabaseClient = null) extends Nat(dbClient) {
+    private val _database = new DummyDatabase
+    override def database: Database = _database
+
     var queryString = ""
 
     override def executeNativeQuery(sql: String): ResultSet = {
@@ -35,6 +43,10 @@ class MiniSqlParserTest extends Specification {
 
     override def insert(tableName: String, values: util.List[Value]): Unit = {
       queryString = values.map(_.text).mkString(",")
+    }
+
+    override def insertSelect(tableName: String, subquery: SubqueryValue): Unit = {
+      queryString = subquery.text
     }
 
     override def delete(tableName: String, where: Where): Unit = {
@@ -661,6 +673,12 @@ class MiniSqlParserTest extends Specification {
       parser.minisql()
       nat.queryString must_== sql
     }
+    "SELECT (SELECT * FROM UNNEST([0,2,3])) AS x" in {
+      val sql = "SELECT (SELECT * FROM UNNEST([0,2,3])) AS x"
+      val (parser, nat) = _createParser(sql)
+      parser.minisql()
+      nat.queryString must_== sql
+    }
   }
   "INSERT" should {
     "INSERT INTO test_tbl VALUES(3, IF( (select count from test_tbl where id=2) > 0, 1, 0))" in {
@@ -669,6 +687,13 @@ class MiniSqlParserTest extends Specification {
       parser.minisql()
       println(nat.queryString)
       nat.queryString must_== "3,IF((select count from test_tbl where id=2 > 0),1,0)"
+    }
+    "INSERT INTO TEST_TABLE SELECT x,y FROM UNNEST([0,1,2,3]) AS x, UNNEST(['A','B','C','D']) AS y" in {
+      val sql = "SELECT x,y FROM UNNEST([0,1,2,3]) as x, UNNEST(['A','B','C','D']) as y"
+      val (parser, nat) = _createParser(sql)
+      parser.minisql()
+      nat.queryString must_== sql
+
     }
   }
   "DELETE" should {

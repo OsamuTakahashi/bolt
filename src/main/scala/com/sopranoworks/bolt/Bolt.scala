@@ -282,9 +282,12 @@ object Bolt {
           val m = Mutation.newUpdateBuilder(tableName)
 
           // set primary key value
-          tbl.primaryKey.columns.foreach(col => keys.find(_.name == col.name).foreach(v => v.setTo(m,v.name)))
+          tbl.primaryKey.columns.foreach(col => keys.find(_.name == col.name).foreach {
+            v =>
+              v.setTo(m,v.name)
+          })
 
-          //  
+          //
           keysAndValues.foreach {
             case KeyValue(k,v) =>
               v.invalidateEvaluatedValueIfContains(cols)
