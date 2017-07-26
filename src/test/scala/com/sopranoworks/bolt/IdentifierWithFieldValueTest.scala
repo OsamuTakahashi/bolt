@@ -74,5 +74,20 @@ class IdentifierWithFieldValueTest extends Specification {
       v.eval.asValue.isInstanceOf[IntValue] must_== true
       v.asValue.asInstanceOf[IntValue].value must_== 1
     }
+    "alias table column name" in {
+      val tbl = Table(null,"TEST_TABLE",
+        List(Column("x",0,"INT64",false),Column("y",1,"INT64",false),Column("y",2,"INT64",false)),
+        Index("PRIMARY_KEY",List(IndexColumn("x",0,"INT64",false,"ASC"))),
+        Map.empty[String,Index])
+      val nat = new DummyNat
+      nat.database.asInstanceOf[DummyDatabase].tables += ("TEST_TABLE"->tbl)
+      val qc = QueryContext(nat,null)
+      qc.addAlias(new TableAlias("T","TEST_TABLE"))
+      val v = IdentifierWithFieldValue("T",List("x"),qc)
+
+      v.resolveReference()
+      v.eval.apply().isInstanceOf[TableColumnValue] must_== true
+      v().asInstanceOf[TableColumnValue].text must_== "TEST_TABLE.x"
+    }
   }
 }
