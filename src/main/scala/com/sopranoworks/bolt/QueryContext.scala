@@ -12,6 +12,7 @@
 package com.sopranoworks.bolt
 
 import com.sopranoworks.bolt.Bolt.Nat
+import com.sopranoworks.bolt.values._
 
 case class QueryContext(nat:Nat,parent:QueryContext) {
   private var _aliases = Map.empty[String,Alias]
@@ -27,7 +28,7 @@ case class QueryContext(nat:Nat,parent:QueryContext) {
       throw new RuntimeException(s"Alias '${alias.name}' is duplicated")
     _aliases += (alias.name->alias)
   }
-  def getAlias(name:String):Option[Alias] = _aliases.get(name)
+  def getAlias(name:String):Option[Alias] = _aliases.get(name) //.orElse(Option(parent).flatMap(_.getAlias(name)))
 
   def addResultAlias(alias:QueryResultAlias):Unit = {
     if (_resultAliases.contains(alias.name))

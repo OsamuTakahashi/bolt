@@ -12,9 +12,11 @@ package com.sopranoworks.bolt
 
 import java.io.ByteArrayInputStream
 
+import com.sopranoworks.bolt.values._
 import com.google.cloud.Date
 import com.google.cloud.spanner.TransactionRunner.TransactionCallable
-import com.google.cloud.spanner._
+import com.google.cloud.spanner.{DatabaseClient, Key, KeySet, Mutation, ResultSet, ResultSets, Statement, Struct, TransactionContext, Type, Value => SValue}
+//import com.google.cloud.spanner._
 import org.antlr.v4.runtime._
 import org.slf4j.LoggerFactory
 
@@ -457,7 +459,7 @@ object Bolt {
           val dbs = p.iterateAll().map {
             db =>
               val b= Struct.newBuilder()
-              b.add("DATABASE_NAME",Value.string(db.getId.getDatabase)).build()
+              b.add("DATABASE_NAME",SValue.string(db.getId.getDatabase)).build()
           }
           ResultSets.forRows(Type.struct(List(Type.StructField.of("DATABASE_NAME",Type.string()))),dbs.asJava)
 
@@ -516,7 +518,7 @@ object Bolt {
         }.toList) ++
         List(s") ${_primaryKeyForTable(tableName).map(k => s"PRIMARY KEY ($k)").getOrElse("") }", s"${ _deleteActionForTable(tableName).getOrElse(""); };") ++
         _showCreateIndexOnTable(tableName))
-          .map(s=>Struct.newBuilder().add(tableName,Value.string(s)).build())
+          .map(s=>Struct.newBuilder().add(tableName,SValue.string(s)).build())
       ResultSets.forRows(Type.struct(List(Type.StructField.of(tableName,Type.string()))),tbl)
     }
 

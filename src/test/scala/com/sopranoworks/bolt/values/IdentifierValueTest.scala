@@ -1,6 +1,8 @@
-package com.sopranoworks.bolt
+package com.sopranoworks.bolt.values
 
-import com.google.cloud.spanner._
+import com.sopranoworks.bolt._
+
+import com.google.cloud.spanner.{ResultSet, ResultSets, Struct, Type, Value=>SValue, Database => SDatabase}
 import org.specs2.mutable.Specification
 
 import scala.collection.JavaConversions._
@@ -18,9 +20,9 @@ class IdentifierValueTest extends Specification {
 
     override def executeNativeQuery(sql: String): ResultSet = {
       val sb = Struct.newBuilder()
-      sb.add("ONE",Value.int64(1))
-      sb.add("TWO",Value.int64(2))
-      sb.add("THREE",Value.int64(2))
+      sb.add("ONE",SValue.int64(1))
+      sb.add("TWO",SValue.int64(2))
+      sb.add("THREE",SValue.int64(2))
 
       ResultSets.forRows(Type.struct(List(Type.StructField.of("ONE",Type.int64()),Type.StructField.of("TWO",Type.int64()),Type.StructField.of("THREE",Type.int64()) )),List(sb.build()))
     }

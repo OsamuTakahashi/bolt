@@ -1,6 +1,6 @@
 # Bolt
 
-The wrapper for using INSERT/UPDATE/DELETE sql query on Google Cloud Spanner.
+The wrapper for executing INSERT/UPDATE/DELETE sql query on Google Cloud Spanner.
 
 ### INSERT/UPDATE/DELETE Syntax
 
@@ -20,7 +20,7 @@ The wrapper for using INSERT/UPDATE/DELETE sql query on Google Cloud Spanner.
 Describe library dependency to .sbt file
 
 ```
-libraryDependencies += "com.sopranoworks" %% "bolt" % "0.12-SNAPSHOT"
+libraryDependencies += "com.sopranoworks" %% "bolt" % "0.13-SNAPSHOT"
 ```
 NOTICE: Bolt currently is not registered to any maven repository.
 
@@ -100,6 +100,8 @@ You must create a instance per thread.
 * CASE Conditional expression is currently not supported in INSERT/UPDATE query
 
 There is no such a limitation in SELECT and subquery.
+
+* Some lterals are currently not supported 
 
 ## Licence
 

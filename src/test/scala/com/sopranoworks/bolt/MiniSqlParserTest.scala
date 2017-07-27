@@ -16,6 +16,7 @@ import java.util
 
 import com.google.cloud.spanner.{DatabaseClient, ResultSet}
 import com.sopranoworks.bolt.Bolt.Nat
+import com.sopranoworks.bolt.values._
 import org.antlr.v4.runtime.{ANTLRInputStream, BailErrorStrategy, CommonTokenStream}
 import org.specs2.mutable.Specification
 

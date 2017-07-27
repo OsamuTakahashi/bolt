@@ -1,4 +1,4 @@
-package com.sopranoworks.bolt
+package com.sopranoworks.bolt.values
 
 import java.util
 

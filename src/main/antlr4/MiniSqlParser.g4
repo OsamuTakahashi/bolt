@@ -8,6 +8,7 @@ import com.google.cloud.spanner.Type;
 import com.google.cloud.Timestamp;
 import org.joda.time.DateTime;
 import org.joda.time.format.DateTimeFormat;
+import com.sopranoworks.bolt.values.*;
 }
 
 @members {
@@ -17,20 +18,6 @@ import org.joda.time.format.DateTimeFormat;
     String instanceId = null;
     int _subqueryDepth = 0;
     ResultSet lastResultSet = null;
-
-    private Boolean insideSelect() {
-        return _subqueryDepth > 0;
-    }
-
-    // for where clause
-    private void enterSelect() {
-        _subqueryDepth += 1;
-    }
-
-    private void exitSelect() {
-        _subqueryDepth -= 1;
-    }
-
     QueryContext qc = null;
 }
 
@@ -78,12 +65,12 @@ query_expr_elem returns [ QueryContext q = null, int columns = 0 ]
         ;
 
 select_stmt returns [ int idx = 0 ]
-        : SELECT { enterSelect(); } (ALL|DISTINCT)?  (AS STRUCT)?
+        : SELECT (ALL|DISTINCT)?  (AS STRUCT)?
             (MUL | expression ( AS? alias { qc.addResultAlias(new QueryResultAlias($alias.text,$idx,qc)); } )? { $idx++; } (',' expression ( AS? alias { qc.addResultAlias(new QueryResultAlias($alias.text,$idx,qc)); } )? { $idx++; } )* )
             ( FROM from_item_with_joind (',' from_item_with_joind)* )?
             ( WHERE bool_expression )?
             ( GROUP BY expression (',' expression)* )?
-            ( HAVING bool_expression )? { exitSelect(); }
+            ( HAVING bool_expression )?
         ;
 
 set_op  : UNION (ALL|DISTINCT)
@@ -495,8 +482,8 @@ scalar_value  returns [ Value v = null ]
         ;
 
 scalar_literal  returns [ Value v = null ]
-        : STRING { /*if (!insideSelect())*/ $v = new StringValue($STRING.text.substring(1,$STRING.text.length() - 1)); }
-        | INT_VAL { /*if (!insideSelect())*/ $v = new IntValue($INT_VAL.text,0,false); }
+        : STRING { $v = new StringValue($STRING.text.substring(1,$STRING.text.length() - 1)); }
+        | INT_VAL { $v = new IntValue($INT_VAL.text,0,false); }
         | DBL_VAL { $v = new DoubleValue($DBL_VAL.text,0,false); }
         | bool_or_null_value { $v = $bool_or_null_value.v; }
         ;

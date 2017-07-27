@@ -8,11 +8,12 @@
   *
   * @author Osamu Takahashi
   */
-package com.sopranoworks.bolt
+package com.sopranoworks.bolt.values
 
 import com.google.cloud.{Date, Timestamp}
 import com.google.cloud.spanner.{Mutation, Struct, Type}
 import com.sopranoworks.bolt.Bolt.Nat
+import com.sopranoworks.bolt._
 import org.joda.time.DateTime
 
 import scala.collection.JavaConverters._

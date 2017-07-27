@@ -11,6 +11,8 @@
   */
 package com.sopranoworks.bolt
 
+import com.sopranoworks.bolt.values._
+
 trait Alias {
   def name:String
   def getField(name:String):Option[Alias] = None

@@ -1,6 +1,7 @@
 package com.sopranoworks.bolt
 
 import com.google.cloud.spanner.{StructReader, Type}
+import com.sopranoworks.bolt.values._
 
 import scala.collection.JavaConverters._
 import scala.collection.JavaConversions._
