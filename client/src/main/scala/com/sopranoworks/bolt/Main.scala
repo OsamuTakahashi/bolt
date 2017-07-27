@@ -1,3 +1,14 @@
+/**
+  * Bolt
+  * Spanner-cli
+  *
+  * Copyright (c) 2017 Osamu Takahashi
+  *
+  * This software is released under the MIT License.
+  * http://opensource.org/licenses/mit-license.php
+  *
+  * @author Osamu Takahashi
+  */
 package com.sopranoworks.bolt
 
 import java.io.{BufferedReader, File, FileInputStream, InputStreamReader}
@@ -14,10 +25,6 @@ import scala.collection.JavaConverters._
   */
 object Main extends App {
   import Bolt._
-//  import codebook.runtime.util.SafeConfig._
-  
-//  val config = ConfigFactory.load()
-
   def spannerOptions(config:Options) = {
     val options = SpannerOptions.newBuilder()
 

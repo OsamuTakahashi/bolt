@@ -20,7 +20,7 @@ The wrapper for executing INSERT/UPDATE/DELETE sql query on Google Cloud Spanner
 Describe library dependency to .sbt file
 
 ```
-libraryDependencies += "com.sopranoworks" %% "bolt" % "0.13-SNAPSHOT"
+libraryDependencies += "com.sopranoworks" %% "bolt" % "0.13"
 ```
 NOTICE: Bolt currently is not registered to any maven repository.
 
@@ -41,7 +41,7 @@ Nat(dbClient).executeQuery("INSERT INTO test_tbl01 VALUES(103,'test insert');")
 
 ```
 
-Transaction query is able to be described as
+Transaction query is able to be used as
 
 ```scala
 dbClient.beginTransaction {
@@ -68,7 +68,7 @@ And also
 dbClient.executeQuery("SELECT * FROM test_tbl01").headOption
 ```
 
-You can use ResultSet safely as like this.
+You can use ResultSet safely like this.
 
 ```scala
 dbClient.executeQuery("SELECT * FROM test_tbl01").autoclose(
@@ -87,7 +87,17 @@ Bolt.Nat nat = Bolt.Nat(client);
 nat.executeQuery("INSERT INTO TEST_TABLE (ID,NAME) VALUES(101,'test');");
 ```
 
-### Notice
+### spanner-cli
+
+This project also contains console spanner client application, spanne-cli.
+
+### spanner-dump
+
+This is a bonus program.
+It will dump a spanner database to sql text code.
+
+
+## Notice
 
 A Nat instance is not thread safe.
 You must create a instance per thread.
