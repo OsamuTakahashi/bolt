@@ -20,9 +20,10 @@ The wrapper for executing INSERT/UPDATE/DELETE sql query on Google Cloud Spanner
 Describe library dependency to .sbt file
 
 ```
+resolvers += "RustyRaven" at "http://rustyraven.github.io"
+
 libraryDependencies += "com.sopranoworks" %% "bolt" % "0.13"
 ```
-NOTICE: Bolt currently is not registered to any maven repository.
 
 And then,
 
