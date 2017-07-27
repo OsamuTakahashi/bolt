@@ -97,7 +97,7 @@ You must create a instance per thread.
 
 * Bytes type is currently not supported in INSERT/UPDATE query 
 * Only few functions are usable in INSERT/UPDATE query
-* CASE Conditional expressions is currently not supported in INSERT/UPDATE query
+* CASE Conditional expression is currently not supported in INSERT/UPDATE query
 
 There is no such a limitation in SELECT and subquery.
 
