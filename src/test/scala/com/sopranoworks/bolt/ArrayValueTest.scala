@@ -64,4 +64,24 @@ class ArrayValueTest extends Specification {
       arr2.length must_== 2
     }
   }
+  "contains" should {
+    "normally success" in {
+      val vlist = new util.ArrayList[Value]()
+      vlist.add(IntValue("1",1,true))
+      vlist.add(IntValue("2",2,true))
+      vlist.add(IntValue("3",3,true))
+
+      val arr = ArrayValue(vlist,false,Type.int64())
+      arr.contains(IntValue(2)) must_== true
+    }
+    "type unmatched" in {
+      val vlist = new util.ArrayList[Value]()
+      vlist.add(StringValue("1"))
+      vlist.add(StringValue("2"))
+      vlist.add(StringValue("3"))
+
+      val arr = ArrayValue(vlist,false,Type.string())
+      arr.contains(IntValue(2)) must_== false
+    }
+  }
 }

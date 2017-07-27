@@ -215,18 +215,46 @@ array_path returns [ Value v = null ]
         ;
 
 bool_expression returns [ Value v = null ]
+                locals [ List<Value> params = null ]
         : a1=bit_or_expr bool_op b1=bit_or_expr { $v = new BooleanExpressionValue($bool_op.text,$a1.v,$b1.v); }
         | a2=bool_expression rel b2=bool_expression { $v = new BooleanExpressionValue($rel.text,$a2.v,$b2.v); }
         | bool_expression IS n1=NOT? bool_or_null_value {
             String op = $n1 != null ? "!=" : "=";
             $v = new BooleanExpressionValue(op,$bool_expression.v,$bool_or_null_value.v);
           }
-        | bit_or_expr BETWEEN bit_or_expr AND bit_or_expr
-        | bit_or_expr NOT? LIKE bit_or_expr
-        | bit_or_expr NOT? IN ( array_expression | '(' query_expr ')' | UNNEST '(' array_expression ')' )
+        | a3=bit_or_expr BETWEEN b3=bit_or_expr AND c3=bit_or_expr {
+            List<Value> params = new ArrayList<Value>();
+            params.add($a3.v);
+            params.add($b3.v);
+            params.add($c3.v);
+            $v = new FunctionValue("\$BETWEEN",params);
+          }
+        | a4=bit_or_expr nt1=NOT? LIKE b4=bit_or_expr {
+            List<Value> params = new ArrayList<Value>();
+            params.add($a4.v);
+            params.add($b4.v);
+            $v = new FunctionValue("\$LIKE",params);
+            if ($nt1 != null) {
+              $v = new BooleanExpressionValue("!",$v,null);
+            }
+          }
+        | bit_or_expr nt2=NOT? IN { $params = new ArrayList<Value>(); }
+            ( array_expression { $params.add($array_expression.v); }
+                | '(' query_expr { $params.add($query_expr.v); } ')'
+                | UNNEST '(' array_expression ')' { $params.add($array_expression.v); } ) {
+            $v = new FunctionValue("\$IN",$params);
+            if ($nt2 != null) {
+              $v = new BooleanExpressionValue("!",$v,null);
+            }
+          }
+        | EXISTS '(' query_expr ')' {
+            List<Value> params = new ArrayList<Value>();
+            params.add($query_expr.v);
+            $v = new FunctionValue("\$EXISTS",params);
+          }
         | bool_value { $v = $bool_value.v; }
         | function { $v = $function.v; }
-        | ID { $v = new IdentifierValue($ID.text,qc); }
+        | ID { $v = (qc == null) ? new IdentifierValue($ID.text,qc) : qc.identifier($ID.text); }
         | field_path { $v = $field_path.v; }
         ;
 
@@ -460,13 +488,6 @@ show_stmt returns [ ResultSet resultSet = null ]
         | SHOW INDEX (FROM|IN) ID { $resultSet = nat.showIndexes($ID.text); }
         ;
 
-//value returns [ Value v = null ]
-//        : scalar_value { $v = $scalar_value.v; }
-//        | array_expression { $v = $array_expression.v; }
-//        | struct_value { $v = $struct_value.v; }
-//        | /* empty */ { $v = NullValue$.MODULE$; }
-//        ;
-
 scalar_value  returns [ Value v = null ]
         : scalar_literal { $v = $scalar_literal.v; }
         | function { $v = $function.v; }
@@ -507,17 +528,7 @@ function returns [ Value v = null ]
         ;
 
 where_stmt returns [ NormalWhere where = null,Value v = null ] locals [ List<WhereCondition> conds = new ArrayList<WhereCondition>() ]
-        : /*WHERE ID EQ value {
-            if (!insideSelect() && nat.isKey(currentTable,$ID.text)) {
-              $where = new PrimaryKeyWhere($ID.text,$value.v.text());
-            }
-          }
-        | WHERE ID IN values {
-            if (!insideSelect() && nat.isKey(currentTable,$ID.text)) {
-              $where = new PrimaryKeyListWhere($ID.text,$values.valueList);
-            }
-          }
-        | */WHERE bool_expression { $v = $bool_expression.v; $where = new NormalWhere("WHERE " + $bool_expression.text,$v); }
+        : WHERE bool_expression { $v = $bool_expression.v; $where = new NormalWhere("WHERE " + $bool_expression.text,$v); }
         ;
 
 values returns [ List<Value> valueList = new ArrayList<Value>() ]
@@ -537,6 +548,4 @@ bool_op returns [ String text = null ]
         | LT { $text = $LT.text; }
         | GEQ { $text = $GEQ.text; }
         | LEQ { $text = $LEQ.text; }
-/*        | LIKE { $text = $LIKE.text; }
-        | NOT LIKE { $text = "NOT LIKE"; } */
         ;

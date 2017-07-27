@@ -26,13 +26,11 @@ trait Value {
   def qtext:String = text
 
   def eval:Value = this
-//  def resetEavaluation:Value = this
 
   def invalidateEvaluatedValueIfContains(values:List[Value]):Boolean = false
-  def contains(values:List[Value]):Boolean = false
+//  def contains(values:List[Value]):Boolean = false
 
   def asValue:Value = this
-//  def isExpression:Boolean = false
   def isBoolean:Boolean = false
   def spannerType:Type = null
 
@@ -42,8 +40,9 @@ trait Value {
     throw new RuntimeException("The value is not storable")
   }
 
+  def isEqualValue(v:Value):Boolean = false
+
   def apply():Value = this
-//  def contains()
 
   def resolveReference(columns:Map[String,TableColumnValue] = Map.empty[String,TableColumnValue]):Map[String,TableColumnValue] = columns
   def getField(fieldIdx:Int):Value = throw new RuntimeException(s"The value '$text' does not have a field #$fieldIdx.")
@@ -66,6 +65,8 @@ trait WrappedValue extends Value {
       case None => false
     }
   }
+
+  override def isEqualValue(v:Value):Boolean = _ref.exists(_.isEqualValue(v))
 
   override def apply():Value = _ref.map(_.apply()).getOrElse(this)
   
@@ -91,17 +92,22 @@ trait TextSetter { _ : Value =>
 case object NullValue extends Value {
   override def text: String = "NULL"
   override def setTo(m: Mutation.WriteBuilder, key: String): Unit = {}
+  override def isEqualValue(v:Value):Boolean = v == NullValue
 }
 
 case class StringValue(text:String) extends Value with TextSetter {
   override def qtext:String = s"'$text'"
   override def spannerType: Type = Type.string()
+  override def isEqualValue(v:Value):Boolean =
+    v.isInstanceOf[StringValue] && v.asInstanceOf[StringValue].text == text
 }
 
 case class BooleanValue(f:Boolean) extends Value with TextSetter {
   override def text:String = if (f) "TRUE" else "FALSE"
   override def isBoolean:Boolean = true
   override def spannerType: Type = Type.bool()
+  override def isEqualValue(v:Value):Boolean =
+    v.isInstanceOf[BooleanValue] && v.asInstanceOf[BooleanValue].f == f
 }
 
 case class IntValue(text:String,var value:Long = 0,var evaluated:Boolean = false) extends Value with TextSetter {
@@ -114,6 +120,8 @@ case class IntValue(text:String,var value:Long = 0,var evaluated:Boolean = false
     this
   }
   override def spannerType: Type = Type.int64()
+  override def isEqualValue(v:Value):Boolean =
+    v.isInstanceOf[IntValue] && v.asInstanceOf[IntValue].value == value
 }
 
 object IntValue {
@@ -130,6 +138,8 @@ case class DoubleValue(text:String,var value:Double = 0,var evaluated:Boolean = 
     this
   }
   override def spannerType: Type = Type.float64()
+  override def isEqualValue(v:Value):Boolean =
+    v.isInstanceOf[DoubleValue] && v.asInstanceOf[DoubleValue].value == value
 }
 
 object DoubleValue {
@@ -139,11 +149,15 @@ object DoubleValue {
 case class TimestampValue(text:String) extends Value with TextSetter {
   override def qtext:String = s"'$text'"
   override def spannerType: Type = Type.timestamp()
+  override def isEqualValue(v:Value):Boolean =
+    v.isInstanceOf[TimestampValue] && v.asInstanceOf[TimestampValue].text == text
 }
 
 case class DateValue(text:String) extends Value with TextSetter  {
   override def qtext:String = s"'$text'"
   override def spannerType: Type = Type.date()
+  override def isEqualValue(v:Value):Boolean =
+    v.isInstanceOf[DateValue] && v.asInstanceOf[DateValue].text == text
 }
 
 case class BytesValue(text:String) extends Value {
@@ -229,6 +243,11 @@ case class ArrayValue(var values:java.util.List[Value],var evaluated:Boolean = f
         throw new RuntimeException("Array offset type must be int64")
     }
     getField(n)
+  }
+
+  def contains(v:Value):Boolean = {
+    this.eval
+    _evaluated.exists(_.isEqualValue(v))
   }
 
   override def setTo(m: Mutation.WriteBuilder, key: String): Unit = {
@@ -484,7 +503,7 @@ case class FunctionValue(name:String,parameters:java.util.List[Value]) extends W
         // internal functions
       case "$ARRAY" =>
         if (parameters.length != 1)
-          throw new RuntimeException("Function IF takes 1 parameter")
+          throw new RuntimeException("Function $ARRAY takes 1 parameter")
 
         _ref = Some(parameters.head match {
           case v:ArrayValue =>
@@ -492,12 +511,12 @@ case class FunctionValue(name:String,parameters:java.util.List[Value]) extends W
           case q:SubqueryValue =>
             q.eval.asArray
           case _ =>
-            throw new RuntimeException("Could not convert to an array")
+            throw new RuntimeException("Could not convert parameters to an array")
         })
 
       case "$OFFSET" =>
         if (parameters.length != 2)
-          throw new RuntimeException("Function IF takes 1 parameter")
+          throw new RuntimeException("Function $OFFSET takes 1 parameter")
         (parameters.get(0).eval.asValue,parameters.get(1).eval.asValue) match {
           case (arr:ArrayValue,i:IntValue) =>
             _ref = Some(arr.offset(i))
@@ -511,7 +530,7 @@ case class FunctionValue(name:String,parameters:java.util.List[Value]) extends W
         
       case "$ORDINAL" =>
         if (parameters.length != 2)
-          throw new RuntimeException("Function IF takes 1 parameter")
+          throw new RuntimeException("Function $ORDINAL takes 1 parameter")
         (parameters.get(0).eval.asValue,parameters.get(1).eval.asValue) match {
           case (arr:ArrayValue,i:IntValue) =>
             _ref = Some(arr.ordinal(i))
@@ -522,17 +541,60 @@ case class FunctionValue(name:String,parameters:java.util.List[Value]) extends W
           case (_,_) =>
             throw new RuntimeException("Invalid operation")
         }
+      case "$EXISTS" =>
+        if (parameters.length != 1)
+          throw new RuntimeException("Function $EXISTS takes 1 parameter")
+        parameters.get(0).eval match {
+          case q : SubqueryValue =>
+            _ref = Some(BooleanValue(q.numRows > 0))
+          case _ =>
+            throw new RuntimeException("Invalid operation at EXISTS")
+        }
 
+      case "$LIKE" =>
+        if (parameters.length != 2)
+          throw new RuntimeException("Function $LIKE takes 2 parameter")
+        (parameters.get(0).eval.asValue,parameters.get(1).eval.asValue) match {
+          case (a:StringValue,b:StringValue) =>
+            _ref = Some(BooleanValue(LikeMatcher(b.text).findFirstIn(a.text).isDefined))
+              
+          case (_,_) =>
+            throw new RuntimeException("Invalid operation at LIKE")
+        }
+
+      case "$IN" =>
+        if (parameters.length != 2)
+          throw new RuntimeException("Function $IN takes 2 parameter")
+        (parameters.get(0).eval.asValue,parameters.get(1).eval.asArray) match {
+          case (v,arr:ArrayValue) =>
+            _ref = Some(BooleanValue(if (arr.length > 0 && v.spannerType == arr.spannerType && v.spannerType != null) {
+              arr.contains(v)
+            } else false))
+
+          case (_,_) =>
+            throw new RuntimeException("Invalid operation at LIKE")
+        }
+
+      case "$BETWEEN" =>
+        if (parameters.length != 3)
+          throw new RuntimeException("Function $BETWEEN takes 3 parameter")
+        val v = parameters.get(0).eval.asValue
+        val a = parameters.get(1).eval.asValue
+        val b = parameters.get(2).eval.asValue
+
+        try {
+          _ref = Some(BooleanExpressionValue("&&", BooleanExpressionValue("<=", a, v), BooleanExpressionValue("<=", v, b)).eval.asValue)
+        } catch {
+          case _ : RuntimeException =>
+            throw new RuntimeException("Invalid operation in BETWEEN")
+        }
+        
       case _ =>
         throw new RuntimeException(s"Unevaluatable function $name")
     }
     this
   }
-//  override def resetEavaluation: Value = {
-//    // !! TEMPORARY !!
-//    if (parameters.nonEmpty) super.resetEavaluation
-//    this
-//  }
+
   override def invalidateEvaluatedValueIfContains(values:List[Value]):Boolean = {
     if (parameters.foldLeft(false) {
       case (f,v) =>
@@ -636,10 +698,7 @@ case class StructValue() extends Value {
   * @param right right expression value
   */
 case class ExpressionValue(op:String,left:Value,right:Value) extends WrappedValue {
-//  private var _ref:Option[Value] = None
-
   override def text = s"(${left.text} $op ${right.text})"
-//  override def isExpression: Boolean = true
   override def eval: Value = {
     if (_ref.isEmpty) {
       (op, left.eval.asValue, if (right != null) right.eval.asValue else right) match {
@@ -1010,8 +1069,6 @@ case class SubqueryValue(nat:Nat,subquery:String,qc:QueryContext,expectedColumns
     }
 
   private def _equalsAllColumnType(st:Struct):Boolean = {
-//    val c = st.getColumnCount
-//    _numColumns = c
     if (_numColumns > 0) {
       val t = st.getColumnType(0)
       _arrayType = t

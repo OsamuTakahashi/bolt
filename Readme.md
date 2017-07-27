@@ -2,7 +2,7 @@
 
 The wrapper for using INSERT/UPDATE/DELETE sql query on Google Cloud Spanner.
 
-### INSERT/UPDATE/DELETE
+### INSERT/UPDATE/DELETE Syntax
 
 #### INSERT
 ![INSERT](images/insert.png)
