@@ -514,7 +514,7 @@ function returns [ Value v = null ]
           }
         ;
 
-where_stmt returns [ NormalWhere where = null,Value v = null ] locals [ List<WhereCondition> conds = new ArrayList<WhereCondition>() ]
+where_stmt returns [ NormalWhere where = null,Value v = null ]
         : WHERE bool_expression { $v = $bool_expression.v; $where = new NormalWhere("WHERE " + $bool_expression.text,$v); }
         ;
 

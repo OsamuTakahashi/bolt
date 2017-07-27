@@ -16,7 +16,6 @@ import com.sopranoworks.bolt.values._
 import com.google.cloud.Date
 import com.google.cloud.spanner.TransactionRunner.TransactionCallable
 import com.google.cloud.spanner.{DatabaseClient, Key, KeySet, Mutation, ResultSet, ResultSets, Statement, Struct, TransactionContext, Type, Value => SValue}
-//import com.google.cloud.spanner._
 import org.antlr.v4.runtime._
 import org.slf4j.LoggerFactory
 

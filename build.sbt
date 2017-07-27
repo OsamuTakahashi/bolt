@@ -20,10 +20,6 @@ val spannerClientLibraries = Seq(
   "com.google.guava" % "guava" % "21.0"
 ) 
 
-val shapelessLibrary = Seq(
-  "com.chuusai" %% "shapeless" % "2.3.2"
-)
-
 val loggingLibraries = Seq(
   "ch.qos.logback" % "logback-classic" % "1.1.7"
 )
@@ -47,7 +43,7 @@ parallelExecution in ThisBuild := false
 
 fork in run := true
 
-val projectVersion = "0.13-SNAPSHOT"
+val projectVersion = "0.13"
 
 val noJavaDoc = Seq(
   publishArtifact in (Compile, packageDoc) := false,
@@ -69,7 +65,6 @@ lazy val core = (project in file("."))
     libraryDependencies ++=
       spannerClientLibraries ++
       codebookLibrary ++
-//      shapelessLibrary ++
       loggingLibraries ++
       testLibraries ++
       commonLibraries,
