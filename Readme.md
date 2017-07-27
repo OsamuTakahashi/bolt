@@ -8,8 +8,10 @@ The wrapper for using INSERT/UPDATE/DELETE sql query on Google Cloud Spanner.
 ![INSERT](images/insert.png)
 
 #### UPDATE
+![INSERT](images/update.png)
 
 #### DELETE
+![INSERT](images/delete.png)
 
 ## How to use
 
