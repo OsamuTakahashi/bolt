@@ -2,14 +2,23 @@
 
 The wrapper for using INSERT/UPDATE/DELETE sql query on Google Cloud Spanner.
 
-## How to
+### INSERT/UPDATE/DELETE
+
+#### INSERT
+![INSERT](images/insert.png)
+
+#### UPDATE
+
+#### DELETE
+
+## How to use
 
 ### In Scala,
 
 Describe library dependency to .sbt file
 
 ```
-libraryDependencies += "com.sopranoworks" %% "bolt" % "0.11-SNAPSHOT"
+libraryDependencies += "com.sopranoworks" %% "bolt" % "0.12-SNAPSHOT"
 ```
 NOTICE: Bolt currently is not registered to any maven repository.
 
@@ -33,7 +42,7 @@ Nat(dbClient).executeQuery("INSERT INTO test_tbl01 VALUES(103,'test insert');")
 Transaction query is able to be described as
 
 ```scala
-beginTransaction {
+dbClient.beginTransaction {
   tr =>
     tr.executeQuery("INSERT INTO test_tbl01 VALUES(103,'test insert');")
 }
@@ -87,7 +96,6 @@ You must create a instance per thread.
 * Bytes type is currently not supported in INSERT/UPDATE query 
 * Only few functions are usable in INSERT/UPDATE query
 * CASE Conditional expressions is currently not supported in INSERT/UPDATE query
-* CAST expressions is currently not supported in INSERT/UPDATE query
 
 There is no such a limitation in SELECT and subquery.
 
