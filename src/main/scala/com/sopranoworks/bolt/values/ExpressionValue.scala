@@ -21,6 +21,14 @@ case class ExpressionValue(op:String,left:Value,right:Value) extends WrappedValu
   override def text = s"(${left.text} $op ${right.text})"
   override def eval: Value = {
     if (_ref.isEmpty) {
+      val l = left.eval.stayUnresolved
+      val r = if (right != null) right.eval.stayUnresolved else false
+
+      _stayUnresolved = l || r
+      if (_stayUnresolved) {
+        return this
+      }
+
       (op, left.eval.asValue, if (right != null) right.eval.asValue else right) match {
         case ("-", l:IntValue, null) =>
           val v = -l.value

@@ -20,12 +20,18 @@ trait Value {
   def text:String
   def qtext:String = text
 
+  def stayUnresolved:Boolean = false
+
   def eval:Value = this
+  def evaluatable:Boolean = true
 
   def invalidateEvaluatedValueIfContains(values:List[Value]):Boolean = false
-//  def contains(values:List[Value]):Boolean = false
 
+  def resolveReference(columns:Map[String,TableColumnValue] = Map.empty[String,TableColumnValue]):Map[String,TableColumnValue] = columns
+
+  def apply():Value = this
   def asValue:Value = this
+
   def isBoolean:Boolean = false
   def spannerType:Type = null
 
@@ -37,9 +43,6 @@ trait Value {
 
   def isEqualValue(v:Value):Boolean = false
 
-  def apply():Value = this
-
-  def resolveReference(columns:Map[String,TableColumnValue] = Map.empty[String,TableColumnValue]):Map[String,TableColumnValue] = columns
   def getField(fieldIdx:Int):Value = throw new RuntimeException(s"The value '$text' does not have a field #$fieldIdx.")
   def getField(fieldName:String):Value = throw new RuntimeException(s"The value '$text' does not have a field '$fieldName'.")
 }
@@ -48,6 +51,11 @@ trait Value {
   *
   */
 trait WrappedValue extends Value {
+  protected var _stayUnresolved = false
+  override def stayUnresolved:Boolean = _ref.map(_.stayUnresolved).getOrElse(_stayUnresolved)
+
+  def setStayUnresolved(f:Boolean):Unit = _stayUnresolved = true
+
   protected var _ref:Option[Value] = None
 
   override def asValue: Value = _ref.map(_.eval.asValue).getOrElse(this)
@@ -56,6 +64,7 @@ trait WrappedValue extends Value {
   override def spannerType: Type = _ref.map(_.spannerType).orNull
 
   override def eval: Value = _ref.map(_.eval).getOrElse(this)
+  override def evaluatable: Boolean = _ref.isDefined
 
   override def invalidateEvaluatedValueIfContains(values:List[Value]):Boolean = {
     _ref match {
@@ -87,20 +96,22 @@ trait TextSetter { _ : Value =>
   }
 }
 
+trait LiteralValue
+
 case object NullValue extends Value {
   override def text: String = "NULL"
   override def setTo(m: Mutation.WriteBuilder, key: String): Unit = {}
   override def isEqualValue(v:Value):Boolean = v == NullValue
 }
 
-case class StringValue(text:String) extends Value with TextSetter {
+case class StringValue(text:String) extends Value with TextSetter with LiteralValue {
   override def qtext:String = s"'$text'"
   override def spannerType: Type = Type.string()
   override def isEqualValue(v:Value):Boolean =
     v.isInstanceOf[StringValue] && v.asInstanceOf[StringValue].text == text
 }
 
-case class BooleanValue(f:Boolean) extends Value with TextSetter {
+case class BooleanValue(f:Boolean) extends Value with TextSetter with LiteralValue {
   override def text:String = if (f) "TRUE" else "FALSE"
   override def isBoolean:Boolean = true
   override def spannerType: Type = Type.bool()
@@ -108,7 +119,7 @@ case class BooleanValue(f:Boolean) extends Value with TextSetter {
     v.isInstanceOf[BooleanValue] && v.asInstanceOf[BooleanValue].f == f
 }
 
-case class IntValue(text:String,var value:Long = 0,var evaluated:Boolean = false) extends Value with TextSetter {
+case class IntValue(text:String,var value:Long = 0,var evaluated:Boolean = false) extends Value with TextSetter with LiteralValue {
   def this(i:Long) = this(i.toString,i,true)
   override def eval: Value = {
     if (!evaluated) {
@@ -126,7 +137,7 @@ object IntValue {
   def apply(i:Long):IntValue = new IntValue(i)
 }
 
-case class DoubleValue(text:String,var value:Double = 0,var evaluated:Boolean = false) extends Value with TextSetter {
+case class DoubleValue(text:String,var value:Double = 0,var evaluated:Boolean = false) extends Value with TextSetter with LiteralValue {
   def this(v:Double) = this(v.toString,v,true)
   override def eval: Value = {
     if (!evaluated) {
@@ -144,21 +155,21 @@ object DoubleValue {
   def apply(v:Double):DoubleValue = new DoubleValue(v)
 }
 
-case class TimestampValue(text:String) extends Value with TextSetter {
+case class TimestampValue(text:String) extends Value with TextSetter with LiteralValue {
   override def qtext:String = s"'$text'"
   override def spannerType: Type = Type.timestamp()
   override def isEqualValue(v:Value):Boolean =
     v.isInstanceOf[TimestampValue] && v.asInstanceOf[TimestampValue].text == text
 }
 
-case class DateValue(text:String) extends Value with TextSetter  {
+case class DateValue(text:String) extends Value with TextSetter with LiteralValue {
   override def qtext:String = s"'$text'"
   override def spannerType: Type = Type.date()
   override def isEqualValue(v:Value):Boolean =
     v.isInstanceOf[DateValue] && v.asInstanceOf[DateValue].text == text
 }
 
-case class BytesValue(text:String) extends Value {
+case class BytesValue(text:String) extends Value with LiteralValue {
   override def spannerType: Type = Type.bytes()
 }
 

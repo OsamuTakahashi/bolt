@@ -267,41 +267,54 @@ object Bolt {
 
     private def _composeUpdateMutations(tr:TransactionContext,tableName:String,
                                         keysAndValues:java.util.List[KeyValue],
-                                        where:NormalWhere,
+                                        where:Where,
                                         usedColumns:Map[String,TableColumnValue]):List[Mutation] = {
       val tbl = database.table(tableName).get
       val cols = usedColumns.values.toList
-      val (keys,values) = _getTargetKeysAndValues(tr,tbl,where.whereStmt,cols)
 
-      values.map {
-        row =>
-          keys.zip(row).foreach {
-            case (k,v) =>
-              k.setValue(v)
-          }
+      if (cols.isEmpty) where.eval()
 
-          val m = Mutation.newUpdateBuilder(tableName)
+      if (where.isOptimizedWhere) {
+        val m = Mutation.newUpdateBuilder(tableName)
+        where.setPrimaryKeys(m)
+        keysAndValues.foreach {
+          case KeyValue(k,v) =>
+            v.eval.asValue.setTo(m,k)
+        }
+        List(m.build())
+      } else {
+        val (keys, values) = _getTargetKeysAndValues(tr, tbl, where.whereStmt, cols)
 
-          // set primary key value
-          tbl.primaryKey.columns.foreach(col => keys.find(_.name == col.name).foreach {
-            v =>
-              v.setTo(m,v.name)
-          })
+        values.map {
+          row =>
+            keys.zip(row).foreach {
+              case (k, v) =>
+                k.setValue(v)
+            }
 
-          //
-          keysAndValues.foreach {
-            case KeyValue(k,v) =>
-              v.invalidateEvaluatedValueIfContains(cols)
-              v.eval.asValue.setTo(m,k)
-          }
-          m.build()
+            val m = Mutation.newUpdateBuilder(tableName)
+
+            // set primary key value
+            tbl.primaryKey.columns.foreach(col => keys.find(_.name == col.name).foreach {
+              v =>
+                v.setTo(m, v.name)
+            })
+
+            //
+            keysAndValues.foreach {
+              case KeyValue(k, v) =>
+                v.invalidateEvaluatedValueIfContains(cols)
+                v.eval.asValue.setTo(m, k)
+            }
+            m.build()
+        }
       }
     }
 
     /**
       * Internal use
       */
-    def update(tableName:String,keysAndValues:java.util.List[KeyValue],where:NormalWhere):Unit = {
+    def update(tableName:String,keysAndValues:java.util.List[KeyValue],where:Where):Unit = {
       val usedColumns =
         keysAndValues.foldLeft(Map.empty[String,TableColumnValue]) {
           case (col,kv) =>
@@ -327,9 +340,10 @@ object Bolt {
       }
     }
 
-    private def _updateSelect(tableName: String, columns:java.util.List[String], subquery: SubqueryValue, where: NormalWhere, tr: TransactionContext) = {
+    private def _updateSelect(tableName: String, columns:java.util.List[String], subquery: SubqueryValue, where: Where, tr: TransactionContext) = {
       val tbl = database.table(tableName).get
       tbl.primaryKey.columns.foreach(k => if (columns.contains(k.name)) throw new RuntimeException(s"${k.name} is primary key"))
+
       val (keys, values) = _getTargetKeysAndValues(tr, tbl, where.whereStmt, Nil)
       val res = subquery.eval.asInstanceOf[SubqueryValue].results
       val reader = new ColumnReader {}
@@ -361,7 +375,7 @@ object Bolt {
       }
     }
 
-    def update(tableName:String,columns:java.util.List[String],subquery:SubqueryValue,where:NormalWhere):Unit = {
+    def update(tableName:String,columns:java.util.List[String],subquery:SubqueryValue,where:Where):Unit = {
       _transactionContext match {
         case Some(tr) =>
           _updateSelect(tableName, columns, subquery, where, tr)
@@ -384,17 +398,16 @@ object Bolt {
       */
     def delete(tableName:String,where:Where):Unit = {
       Option(where) match {
-        case Some(PrimaryKeyWhere(k,v)) =>
-          val m = Mutation.delete(tableName,Key.of(v))
-          _transactionContext match {
-            case Some(_) =>
-              _mutations ++= List(m)
-            case _ =>
-              Option(dbClient).foreach(_.write(List(m)))
-          }
+//        case Some(PrimaryKeyWhere(k,v)) =>
+//          val m = Mutation.delete(tableName,Key.of(v))
+//          _transactionContext match {
+//            case Some(_) =>
+//              _mutations ++= List(m)
+//            case _ =>
+//              Option(dbClient).foreach(_.write(List(m)))
+//          }
 
-        case Some(NormalWhere(w,_)) =>
-//          _logger.info(s"Slow delete query on $tableName. Reason => $w")
+        case Some(Where(_,_,w,_)) =>
           _transactionContext match {
             case Some(tr) =>
               val keys = _getTargetKeys(tr,tableName,w)

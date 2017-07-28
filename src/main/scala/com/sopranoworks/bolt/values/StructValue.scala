@@ -20,15 +20,26 @@ import scala.collection.JavaConversions._
   *
   */
 case class StructValue() extends Value {
+  private var _stayUnresolved = false
   private var _evaluated = false
   private var _members:List[Value] = Nil
   private var _aliases = Map.empty[String,Int]
 
   override def text = s"STRUCT(${_members.map(_.text).mkString(",")})"
 
+  override def stayUnresolved: Boolean = _stayUnresolved
+
   override def eval: Value = {
     if (!_evaluated) {
-      _members = _members.map(_.eval.asValue)
+      _stayUnresolved = _members.foldLeft(false) {
+        case (f,v) =>
+          f || v.eval.stayUnresolved
+      }
+
+      if (_stayUnresolved)
+        return this
+
+      _members = _members.map(_.asValue)
       _evaluated = true
     }
     this

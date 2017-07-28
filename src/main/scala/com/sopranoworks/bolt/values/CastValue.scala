@@ -24,6 +24,12 @@ case class CastValue(expression:Value,toType:Type) extends Value with WrappedVal
   override def text: String = s"CAST(${expression.text} AS $toType)"
   override def eval: Value = {
     if (_ref.isEmpty) {
+      expression.eval
+      _stayUnresolved = expression.stayUnresolved
+      if (_stayUnresolved) {
+        return this
+      }
+
       toType match {
         case tp if tp == Type.bool() =>
           expression.eval.asValue match {

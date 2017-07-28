@@ -23,6 +23,14 @@ case class BooleanExpressionValue(op:String,left:Value,right:Value) extends Wrap
 
   override def eval: Value = {
     if (_ref.isEmpty) {
+      val l = left.eval.stayUnresolved
+      val r = if (right != null) right.eval.stayUnresolved else false
+
+      _stayUnresolved = l || r
+      if (_stayUnresolved) {
+        return this
+      }
+
       (op, left.eval.asValue, if (right != null) right.eval.asValue else right) match {
         case ("<",l:IntValue,r:IntValue) =>
           _ref = Some(BooleanValue(l.value < r.value))
@@ -79,10 +87,12 @@ case class BooleanExpressionValue(op:String,left:Value,right:Value) extends Wrap
           _ref = Some(BooleanValue(l.value != r.value))
 
 
-        case ("&&",l:BooleanValue,r:BooleanValue) =>
+        case ("AND",l:BooleanValue,r:BooleanValue) =>
           _ref = Some(BooleanValue(l.f && r.f))
-        case ("||",l:BooleanValue,r:BooleanValue) =>
+        case ("OR",l:BooleanValue,r:BooleanValue) =>
           _ref = Some(BooleanValue(l.f || r.f))
+        case ("XOR",l:BooleanValue,r:BooleanValue) =>
+          _ref = Some(BooleanValue(l.f ^ r.f))
         case ("!",l:BooleanValue,_) =>
           _ref = Some(BooleanValue(!l.f))
 

@@ -13,11 +13,13 @@ package com.sopranoworks.bolt.values
 
 import com.google.cloud.spanner.{Mutation, Type}
 
-import scala.collection.JavaConverters._
 import scala.collection.JavaConversions._
 
-case class ArrayValue(var values:java.util.List[Value],var evaluated:Boolean = false,var arrayType:Type = null) extends Value  {
+case class ArrayValue(var values:java.util.List[Value],var evaluated:Boolean = false,var arrayType:Type = null) extends Value with LiteralValue {
   private var _evaluated = List.empty[Value]
+  private var _stayUnresolved = false
+
+  override def stayUnresolved: Boolean = _stayUnresolved
 
   private def _isValidArray:Boolean = {
     if (_evaluated.isEmpty) {
@@ -35,7 +37,14 @@ case class ArrayValue(var values:java.util.List[Value],var evaluated:Boolean = f
 
   override def eval: Value = {
     if (!evaluated || values.length != _evaluated.length) {
-      _evaluated = values.toList.map(_.eval.asValue).filter(_ != NullValue)
+      _stayUnresolved = values.foldLeft(false) {
+        case (f,v) =>
+          f || v.eval.stayUnresolved
+      }
+      if (_stayUnresolved)
+        return this
+
+      _evaluated = values.toList.map(_.asValue).filter(_ != NullValue)
       if (!_isValidArray)
         throw new RuntimeException("")
       evaluated = true

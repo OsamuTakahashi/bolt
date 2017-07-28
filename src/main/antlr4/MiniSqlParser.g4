@@ -349,7 +349,7 @@ update_stmt
 
 delete_stmt returns [ ResultSet resultSet = null ]
             locals [ Where where = null ]
-        : DELETE { qc = new QueryContext(nat,qc); } FROM ID { currentTable = $ID.text; } (where_stmt { $where = /*($where_stmt.where == null) ? new NormalWhere($where_stmt.text) :*/ $where_stmt.where; })? {
+        : DELETE { qc = new QueryContext(nat,qc); } FROM ID { currentTable = $ID.text; } (where_stmt { $where = $where_stmt.where; })? {
             nat.delete(currentTable,$where);
             qc = qc.parent();
           }
@@ -514,8 +514,8 @@ function returns [ Value v = null ]
           }
         ;
 
-where_stmt returns [ NormalWhere where = null,Value v = null ]
-        : WHERE bool_expression { $v = $bool_expression.v; $where = new NormalWhere("WHERE " + $bool_expression.text,$v); }
+where_stmt returns [ Where where = null,Value v = null ]
+        : WHERE bool_expression { $v = $bool_expression.v; $where = new Where(qc,null,"WHERE " + $bool_expression.text,$v); }
         ;
 
 values returns [ List<Value> valueList = new ArrayList<Value>() ]

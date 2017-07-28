@@ -40,7 +40,7 @@ case class TableColumnValue(name:String,tableName:String,index:Int) extends Wrap
   override def text: String = s"$tableName.$name"
   override def eval: Value =
     _ref match {
-      case Some(v) => v
+      case Some(v) => v.eval
       case None =>
         this
     }
@@ -49,19 +49,18 @@ case class TableColumnValue(name:String,tableName:String,index:Int) extends Wrap
     val key = s"$tableName.$name"
     if (!columns.contains(key)) columns + (key->this) else columns
   }
-
-
+  
   override def invalidateEvaluatedValueIfContains(values: List[Value]): Boolean = {
     values.contains(this)
   }
 
   override def asValue: Value = {
     this.eval
-    if (_ref.isEmpty) {
-      this.resolveReference(Map())
-      if (_ref.isEmpty)
+//    if (_ref.isEmpty) {
+//      this.resolveReference(Map())
+      if (_ref.isEmpty && !_stayUnresolved)
         throw new RuntimeException(s"Unresolvable table column identifier $name")
-    }
-    _ref.get.eval.asValue
+//    }
+    _ref.map(_.eval.asValue).getOrElse(this)
   }
 }

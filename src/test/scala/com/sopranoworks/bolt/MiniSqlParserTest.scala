@@ -51,13 +51,10 @@ class MiniSqlParserTest extends Specification {
     }
 
     override def delete(tableName: String, where: Where): Unit = {
-      where match {
-        case NormalWhere(w,_) =>
-          queryString = w
-      }
+      queryString = where.whereStmt
     }
 
-    override def update(tableName: String, keysAndValues: util.List[KeyValue], where: NormalWhere): Unit = {
+    override def update(tableName: String, keysAndValues: util.List[KeyValue], where: Where): Unit = {
       queryString = keysAndValues.get(0).value.eval.asValue.text
     }
 
