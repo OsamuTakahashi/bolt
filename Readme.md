@@ -90,11 +90,18 @@ nat.executeQuery("INSERT INTO TEST_TABLE (ID,NAME) VALUES(101,'test');");
 
 This project also contains console spanner client application, spanne-cli.
 
+dist/spanner-cli-0.14.zip
+
+MD5:1d11463f3ace9a86abeaa5c3f9815fb7
+
 ### spanner-dump
 
 This is a bonus program.
 It will dump a spanner database to sql text code.
 
+dist/spanner-dump-0.14.zip
+
+MD5:11dd5f474992ebe3399205fc3a328c00
 
 ## Notice
 
@@ -107,6 +114,7 @@ You must create a instance per thread.
 * Bytes type is currently not supported in INSERT/UPDATE query 
 * Only few functions are usable in INSERT/UPDATE query
 * CASE Conditional expression is currently not supported in INSERT/UPDATE query
+* UNNEST operation is currently not supported in INSERT/UPDATE query
 
 There is no such a limitation in SELECT and subquery.
 

@@ -16,7 +16,6 @@ import com.sopranoworks.bolt.values.*;
     Admin admin = null;
     String currentTable = null;
     String instanceId = null;
-    int _subqueryDepth = 0;
     ResultSet lastResultSet = null;
     QueryContext qc = null;
 }
@@ -52,7 +51,6 @@ query_stmt returns [ Value v = null ]
 
 query_expr returns [ QueryContext q = null, SubqueryValue v = null, int columns = 0 ]
         : { qc = new QueryContext(nat,qc); $q = qc; }  ( query_expr_elem { $columns = $query_expr_elem.columns; } | query_expr_elem { $columns = $query_expr_elem.columns; } set_op query_expr )(ORDER BY expression (ASC|DESC)? (',' expression (ASC|DESC)? )* )? ( LIMIT count ( OFFSET skip_rows )? )? {
-//              System.out.println("query_expr:" + $query_expr.text);
               $v = new SubqueryValue(nat,$query_expr.text,qc,$columns);
               qc = qc.parent();
             }

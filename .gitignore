@@ -4,3 +4,4 @@ target/
 *.conf
 *.json
 *.log
+.DS_Store
