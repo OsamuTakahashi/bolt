@@ -4,11 +4,12 @@ val projectScalaVersion = "2.11.8"
 
 val scalaVersions = Seq("2.11.8", "2.12.2")
 
-resolvers in Global += "RustyRaven" at "http://rustyraven.github.io"
+//resolvers in Global += "RustyRaven" at "http://rustyraven.github.io"
+resolvers in Global += "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots"
 
 resolvers in Global += "scalaz-bintray" at "http://dl.bintray.com/scalaz/releases"
 
-val codebookLibrary = Seq("com.rustyraven" %% "codebook-runtime" % "1.3.2-SNAPSHOT" excludeAll(
+val codebookLibrary = Seq("com.rusty-raven" %% "codebook-runtime" % "1.3.2-SNAPSHOT" excludeAll(
   ExclusionRule(organization = "com.typesafe.akka"),
   ExclusionRule(organization = "net.liftweb")
 ))
