@@ -172,18 +172,3 @@ case class DateValue(text:String) extends Value with TextSetter with LiteralValu
 case class BytesValue(text:String) extends Value with LiteralValue {
   override def spannerType: Type = Type.bytes()
 }
-
-
-//case class SubfieldValue(value:Value,fieldNames:List[String]) extends WrappedValue {
-//  override def text: String = s"${value.text}.${fieldNames.mkString(",")}"
-//
-//  override def eval: Value = {
-//    if (_ref.isEmpty) {
-//      _ref = Some(fieldNames.foldLeft(value) {
-//        case (v, name) =>
-//          v.getField(name)
-//      })
-//    }
-//    this
-//  }
-//}

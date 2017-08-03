@@ -107,14 +107,6 @@ case class SubqueryValue(nat:Nat,subquery:String,qc:QueryContext,expectedColumns
         st =>
           _numColumns = st.getColumnCount
       }
-//      if (r.length > 1 && _numColumns > 1)
-//        throw new RuntimeException(s"The subquery has multi rows:$subquery")
-//
-//      r.headOption.foreach(
-//        row =>
-//          if (!_equalsAllColumnType(row))
-//            throw new RuntimeException
-//      )
       _result = Some(r)
     }
     this

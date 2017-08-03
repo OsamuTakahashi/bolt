@@ -56,11 +56,8 @@ case class TableColumnValue(name:String,tableName:String,index:Int) extends Wrap
 
   override def asValue: Value = {
     this.eval
-//    if (_ref.isEmpty) {
-//      this.resolveReference(Map())
       if (_ref.isEmpty && !_stayUnresolved)
         throw new RuntimeException(s"Unresolvable table column identifier $name")
-//    }
     _ref.map(_.eval.asValue).getOrElse(this)
   }
 }

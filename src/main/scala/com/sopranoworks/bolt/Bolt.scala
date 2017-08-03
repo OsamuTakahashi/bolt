@@ -261,10 +261,6 @@ object Bolt {
         })
     }
 
-//    private def _preUpdateQuery(usedColumns:Map[String,TableColumnValue]):ResultSet = {
-//
-//    }
-
     private def _composeUpdateMutations(tr:TransactionContext,tableName:String,
                                         keysAndValues:java.util.List[KeyValue],
                                         where:Where,
@@ -320,10 +316,6 @@ object Bolt {
           case (col,kv) =>
             kv.value.resolveReference(col)
         }
-
-//      if (usedColumns.nonEmpty) {
-//        // required pre query
-//      }
 
       _transactionContext match {
         case Some(tr) =>
@@ -398,15 +390,6 @@ object Bolt {
       */
     def delete(tableName:String,where:Where):Unit = {
       Option(where) match {
-//        case Some(PrimaryKeyWhere(k,v)) =>
-//          val m = Mutation.delete(tableName,Key.of(v))
-//          _transactionContext match {
-//            case Some(_) =>
-//              _mutations ++= List(m)
-//            case _ =>
-//              Option(dbClient).foreach(_.write(List(m)))
-//          }
-
         case Some(Where(_,_,w,_)) =>
           _transactionContext match {
             case Some(tr) =>
@@ -441,6 +424,8 @@ object Bolt {
         case _ =>
       }
     }
+
+    // Utility methods (for client application)
 
     def createDatabase(admin:Admin,instanceId:String,databaseName:String):Boolean = {
       (Option(admin),Option(instanceId)) match {
@@ -550,6 +535,13 @@ object Bolt {
       throw DatabaseChangedException(name)
 
 
+    /**
+      * A transaction wrapper
+      *
+      * @param f The function object for the operation
+      * @tparam T The result type
+      * @return Some result of type T
+      */
     def beginTransaction[T](f:Nat => T):T = {
       val self = this
       dbClient.readWriteTransaction()
@@ -567,6 +559,14 @@ object Bolt {
         })
     }
 
+    /**
+      * A transcation wrapper with default result value
+      *
+      * @param f The function object for the operation
+      * @param default the default value on failure
+      * @tparam T The result type
+      * @return Some result of type T
+      */
     def beginTransaction[T](f:Nat => T,default:T):T = {
       val self = this
       dbClient.readWriteTransaction()

@@ -56,14 +56,14 @@ case class StructValue() extends Value {
 
   override def getField(fieldIdx: Int): Value = {
     if (fieldIdx < 0 || _members.length <= fieldIdx)
-      throw new RuntimeException("THe specified filed index is out of range")
+      throw new RuntimeException("The specified field index is out of range")
     _members(fieldIdx)
   }
 
   override def getField(fieldName: String): Value = {
     _aliases.get(fieldName) match {
       case Some(idx) => getField(idx)
-      case None => throw new RuntimeException(s"The struct does not have field named '$fieldName'")
+      case None => throw new RuntimeException(s"The struct does not have a field named '$fieldName'")
     }
   }
 
