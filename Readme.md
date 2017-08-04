@@ -92,7 +92,7 @@ This project also contains console spanner client application, spanne-cli.
 
 dist/spanner-cli-0.14.zip
 
-MD5:1d11463f3ace9a86abeaa5c3f9815fb7
+MD5:c27ac438bdec370cbe78b3f148f71bb3
 
 ### spanner-dump
 
@@ -101,7 +101,7 @@ It will dump a spanner database to sql text code.
 
 dist/spanner-dump-0.14.zip
 
-MD5:11dd5f474992ebe3399205fc3a328c00
+MD5:42c488cee2c40d77c46caa4042826433
 
 ## Notice
 
