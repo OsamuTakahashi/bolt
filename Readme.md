@@ -1,6 +1,6 @@
 # Bolt
 
-The wrapper for executing INSERT/UPDATE/DELETE sql query on Google Cloud Spanner.
+The wrapper library for executing INSERT/UPDATE/DELETE sql query on Google Cloud Spanner.
 
 ### INSERT/UPDATE/DELETE Syntax
 
@@ -8,16 +8,16 @@ The wrapper for executing INSERT/UPDATE/DELETE sql query on Google Cloud Spanner
 ![INSERT](images/insert.png)
 
 #### UPDATE
-![INSERT](images/update.png)
+![UPDATE](images/update.png)
 
 #### DELETE
-![INSERT](images/delete.png)
+![DELETE](images/delete.png)
 
 ## How to use
 
 ### In Scala,
 
-Describe library dependency to .sbt file
+Write library dependency to .sbt file
 
 ```
 libraryDependencies += "com.sopranoworks" %% "bolt" % "0.14"
@@ -40,7 +40,7 @@ Nut(dbClient).executeQuery("INSERT INTO test_tbl01 VALUES(103,'test insert');")
 
 ```
 
-Transaction query is able to be used as
+A transaction query can be used as this.
 
 ```scala
 dbClient.beginTransaction {
@@ -52,7 +52,7 @@ dbClient.beginTransaction {
 
 #### Other functions
 
-ResultSet is able to be used as Iterator
+ResultSet can be used as Iterator.
 
 ```scala
 dbClient.executeQuery("SELECT * FROM test_tbl01").map {
@@ -111,14 +111,15 @@ You must create a instance per thread.
 
 ## Limitations
 
-* Bytes type is currently not supported in INSERT/UPDATE query 
-* Only few functions are usable in INSERT/UPDATE query
-* CASE Conditional expression is currently not supported in INSERT/UPDATE query
-* UNNEST operation is currently not supported in INSERT/UPDATE query
+* Bytes type is currently not supported in an INSERT/UPDATE query. 
+* Only few functions are usable in an INSERT/UPDATE query.
+* CASE Conditional expression is currently not supported in an INSERT/UPDATE query.
+* UNNEST operation is currently not supported in an INSERT/UPDATE query.
 
 There is no such a limitation in SELECT and subquery.
 
-* Some lterals are currently not supported 
+* Referencing outside (INSERT/UPDATE statement's) alias in subquery is not supported in an INSERT/UPDATE query.
+* Some lterals are currently not supported.
 
 ## Licence
 
