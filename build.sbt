@@ -4,18 +4,15 @@ val projectScalaVersion = "2.11.8"
 
 val scalaVersions = Seq("2.11.8", "2.12.2")
 
-//resolvers in Global += "RustyRaven" at "http://rustyraven.github.io"
-resolvers in Global += "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots"
-
 resolvers in Global += "scalaz-bintray" at "http://dl.bintray.com/scalaz/releases"
 
-val codebookLibrary = Seq("com.rusty-raven" %% "codebook-runtime" % "1.3.2-SNAPSHOT" excludeAll(
+val codebookLibrary = Seq("com.rusty-raven" %% "codebook-runtime" % "1.3.3" excludeAll(
   ExclusionRule(organization = "com.typesafe.akka"),
   ExclusionRule(organization = "net.liftweb")
 ))
 
 val spannerClientLibraries = Seq(
-//  "com.google.cloud" % "google-cloud-spanner" % "0.20.3-beta",
+//  "com.google.cloud" % "google-cloud-spanner" % "0.20.3-beta",  // not work with SIGILL hack
   "com.google.cloud" % "google-cloud-spanner" % "0.19.0-beta",
   "com.google.auth" % "google-auth-library-oauth2-http" % "0.6.0",
   "com.google.guava" % "guava" % "21.0"
@@ -69,7 +66,7 @@ lazy val core = (project in file("."))
       loggingLibraries ++
       testLibraries ++
       commonLibraries,
-    dependencyOverrides += "io.netty" % "netty-tcnative-boringssl-static" % "1.1.33.Fork22"
+    dependencyOverrides += "io.netty" % "netty-tcnative-boringssl-static" % "1.1.33.Fork22"  // for SIGILL hack on old intel CPUs
   )
   .settings(noJavaDoc: _*)
 
