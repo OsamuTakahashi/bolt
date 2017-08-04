@@ -175,7 +175,7 @@ object Main extends App {
 
                 if (sql.nonEmpty) {
                   try {
-                    Option(new Nat(dbClient).executeQuery(sql, admin, instance)).foreach {
+                    Option(new Nut(dbClient).executeQuery(sql, admin, instance)).foreach {
                       res =>
                         showResult(res)
                         res.close()

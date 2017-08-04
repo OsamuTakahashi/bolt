@@ -22,7 +22,7 @@ case class TableValue(name:String,qc:QueryContext) extends Value {
 
   override def getField(fieldName: String): Value =
     (for {
-      tbl<-qc.nat.database.table(name)
+      tbl<-qc.nut.database.table(name)
       col<-tbl.columns.find(_.name == fieldName)
     } yield {
       TableColumnValue(fieldName,name,col.position)

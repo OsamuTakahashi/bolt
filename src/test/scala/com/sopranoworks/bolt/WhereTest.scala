@@ -16,7 +16,7 @@ class WhereTest extends Specification {
     override def table(name: String): Option[Table] = tables.get(name)
   }
 
-  class DummyNat extends Bolt.Nat(null) {
+  class DummyNut extends Bolt.Nut(null) {
     private val _database = new DummyDatabase
     override def database: Database = _database
 
@@ -57,7 +57,7 @@ class WhereTest extends Specification {
       w.isOptimizedWhere must_== true
     } */
     "lack primary key" in {
-      val nat = new DummyNat
+      val nat = new DummyNut
       nat.database.asInstanceOf[DummyDatabase].tables += ("TEST_TABLE"->
         Table(null,"TEST_TABLE",List(Column("ID1",0,"INT64",false),Column("ID2",1,"INT64",false)),Index("PRIMARY_KEY",List(IndexColumn("ID1",0,"INT64",false,"ASC"),IndexColumn("ID2",1,"INT64",false,"ASC"))),Map.empty[String,Index]))
       val qc = QueryContext(nat,null)
@@ -71,7 +71,7 @@ class WhereTest extends Specification {
       val tokenStream = new CommonTokenStream(lexer)
       val parser = new MiniSqlParser(tokenStream)
       parser.setErrorHandler(new BailErrorStrategy())
-      parser.nat = nat
+      parser.nut = nat
       parser.qc = qc
 
       val r = parser.where_stmt()
@@ -79,7 +79,7 @@ class WhereTest extends Specification {
       r.where.isOptimizedWhere must_== false
     }
     "one AND with parser" in {
-      val nat = new DummyNat
+      val nat = new DummyNut
       nat.database.asInstanceOf[DummyDatabase].tables += ("TEST_TABLE"->
         Table(null,"TEST_TABLE",List(Column("ID1",0,"INT64",false),Column("ID2",1,"INT64",false)),Index("PRIMARY_KEY",List(IndexColumn("ID1",0,"INT64",false,"ASC"),IndexColumn("ID2",1,"INT64",false,"ASC"))),Map.empty[String,Index]))
       val qc = QueryContext(nat,null)
@@ -93,7 +93,7 @@ class WhereTest extends Specification {
       val tokenStream = new CommonTokenStream(lexer)
       val parser = new MiniSqlParser(tokenStream)
       parser.setErrorHandler(new BailErrorStrategy())
-      parser.nat = nat
+      parser.nut = nat
       parser.qc = qc
 
       val r = parser.where_stmt()
@@ -101,7 +101,7 @@ class WhereTest extends Specification {
       r.where.isOptimizedWhere must_== true
     }
     "one AND with parser 2" in {
-      val nat = new DummyNat
+      val nat = new DummyNut
       nat.database.asInstanceOf[DummyDatabase].tables += ("TEST_TABLE"->
         Table(null,"TEST_TABLE",List(Column("ID1",0,"INT64",false),Column("ID2",1,"INT64",false)),Index("PRIMARY_KEY",List(IndexColumn("ID1",0,"INT64",false,"ASC"),IndexColumn("ID2",1,"INT64",false,"ASC"))),Map.empty[String,Index]))
       val qc = QueryContext(nat,null)
@@ -115,7 +115,7 @@ class WhereTest extends Specification {
       val tokenStream = new CommonTokenStream(lexer)
       val parser = new MiniSqlParser(tokenStream)
       parser.setErrorHandler(new BailErrorStrategy())
-      parser.nat = nat
+      parser.nut = nat
       parser.qc = qc
 
       val r = parser.where_stmt()
@@ -123,7 +123,7 @@ class WhereTest extends Specification {
       r.where.isOptimizedWhere must_== true
     }
     "one AND including comprer operator with parser" in {
-      val nat = new DummyNat
+      val nat = new DummyNut
       nat.database.asInstanceOf[DummyDatabase].tables += ("TEST_TABLE"->
         Table(null,"TEST_TABLE",List(Column("ID1",0,"INT64",false),Column("ID2",1,"INT64",false)),Index("PRIMARY_KEY",List(IndexColumn("ID1",0,"INT64",false,"ASC"),IndexColumn("ID2",1,"INT64",false,"ASC"))),Map.empty[String,Index]))
       val qc = QueryContext(nat,null)
@@ -137,7 +137,7 @@ class WhereTest extends Specification {
       val tokenStream = new CommonTokenStream(lexer)
       val parser = new MiniSqlParser(tokenStream)
       parser.setErrorHandler(new BailErrorStrategy())
-      parser.nat = nat
+      parser.nut = nat
       parser.qc = qc
 
       val r = parser.where_stmt()
@@ -145,7 +145,7 @@ class WhereTest extends Specification {
       r.where.isOptimizedWhere must_== false
     }
     "one AND including none key column with parser" in {
-      val nat = new DummyNat
+      val nat = new DummyNut
       nat.database.asInstanceOf[DummyDatabase].tables += ("TEST_TABLE"->
         Table(null,"TEST_TABLE",List(Column("ID1",0,"INT64",false),Column("ID2",1,"INT64",false),Column("COL",2,"INT64",false)),Index("PRIMARY_KEY",List(IndexColumn("ID1",0,"INT64",false,"ASC"),IndexColumn("ID2",1,"INT64",false,"ASC"))),Map.empty[String,Index]))
       val qc = QueryContext(nat,null)
@@ -159,7 +159,7 @@ class WhereTest extends Specification {
       val tokenStream = new CommonTokenStream(lexer)
       val parser = new MiniSqlParser(tokenStream)
       parser.setErrorHandler(new BailErrorStrategy())
-      parser.nat = nat
+      parser.nut = nat
       parser.qc = qc
 
       val r = parser.where_stmt()
@@ -167,7 +167,7 @@ class WhereTest extends Specification {
       r.where.isOptimizedWhere must_== false
     }
     "2 AND with parser" in {
-      val nat = new DummyNat
+      val nat = new DummyNut
       nat.database.asInstanceOf[DummyDatabase].tables += ("TEST_TABLE"->
         Table(null,"TEST_TABLE",List(Column("ID1",0,"INT64",false),Column("ID2",1,"INT64",false),Column("ID3",2,"INT64",false)),Index("PRIMARY_KEY",List(IndexColumn("ID1",0,"INT64",false,"ASC"),IndexColumn("ID2",1,"INT64",false,"ASC"),IndexColumn("ID3",2,"INT64",false,"ASC"))),Map.empty[String,Index]))
       val qc = QueryContext(nat,null)
@@ -181,7 +181,7 @@ class WhereTest extends Specification {
       val tokenStream = new CommonTokenStream(lexer)
       val parser = new MiniSqlParser(tokenStream)
       parser.setErrorHandler(new BailErrorStrategy())
-      parser.nat = nat
+      parser.nut = nat
       parser.qc = qc
 
       val r = parser.where_stmt()

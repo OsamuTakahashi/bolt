@@ -12,7 +12,7 @@ class TableColumnValueTest extends Specification {
     override def table(name: String): Option[Table] = tables.get(name)
   }
 
-  class DummyNat extends Bolt.Nat(null) {
+  class DummyNut extends Bolt.Nut(null) {
     private val _database = new DummyDatabase
     override def database: Database = _database
 
@@ -121,7 +121,7 @@ class TableColumnValueTest extends Specification {
       ex.eval.asValue.asInstanceOf[IntValue].value must_== 61
     }
     "invalidate after evaluation containing subquery" in {
-      val nat = new DummyNat
+      val nat = new DummyNut
       val qc = QueryContext(nat,null)
 
       val col1 = TableColumnValue("ONE","TEST_TABLE",0)

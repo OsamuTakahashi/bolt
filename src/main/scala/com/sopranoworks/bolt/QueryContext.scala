@@ -11,10 +11,10 @@
   */
 package com.sopranoworks.bolt
 
-import com.sopranoworks.bolt.Bolt.Nat
+import com.sopranoworks.bolt.Bolt.Nut
 import com.sopranoworks.bolt.values._
 
-case class QueryContext(nat:Nat,parent:QueryContext) {
+case class QueryContext(nut:Nut, parent:QueryContext) {
   private var _aliases = Map.empty[String,Alias]
   private var _resultAliases = Map.empty[String,QueryResultAlias]
   private var _currentTableName:Option[String] = None

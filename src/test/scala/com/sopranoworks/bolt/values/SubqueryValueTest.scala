@@ -5,7 +5,7 @@ import com.sopranoworks.bolt._
 import java.util
 
 import com.google.cloud.spanner._
-import com.sopranoworks.bolt.Bolt.Nat
+import com.sopranoworks.bolt.Bolt.Nut
 import com.typesafe.config.ConfigFactory
 import org.specs2.mutable.Specification
 import org.specs2.specification.BeforeAfterEach
@@ -35,7 +35,7 @@ class SubqueryValueTest extends Specification/* with BeforeAfterEach*/ {
 //    _options.foreach(_.getService.close())
 //  }
   
-  case class DummyNat(res:ResultSet) extends Nat(null) {
+  case class DummyNut(res:ResultSet) extends Nut(null) {
     override def executeNativeQuery(sql: String): ResultSet = res
   }
 
@@ -47,7 +47,7 @@ class SubqueryValueTest extends Specification/* with BeforeAfterEach*/ {
       sb.add("THREE",Value.int64(2))
 
       val res = ResultSets.forRows(Type.struct(List(Type.StructField.of("ONE",Type.int64()),Type.StructField.of("TWO",Type.int64()),Type.StructField.of("THREE",Type.int64()) )),List(sb.build()))
-      val sq = SubqueryValue(DummyNat(res),"",QueryContext(null,null))
+      val sq = SubqueryValue(DummyNut(res),"",QueryContext(null,null))
       val arr = sq.eval.asArray
 
       arr.eval.spannerType must_== Type.int64()
@@ -61,7 +61,7 @@ class SubqueryValueTest extends Specification/* with BeforeAfterEach*/ {
             sb.add("ONE",Value.int64(i + 1))
             sb.build()
         }.toList)
-      val sq = SubqueryValue(DummyNat(res),"",QueryContext(null,null))
+      val sq = SubqueryValue(DummyNut(res),"",QueryContext(null,null))
       val arr = sq.eval.asArray
 
       arr.spannerType must_== Type.int64()
@@ -77,7 +77,7 @@ class SubqueryValueTest extends Specification/* with BeforeAfterEach*/ {
             sb.add("THREE",Value.int64(2))
             sb.build()
         }.toList)
-      val sq = SubqueryValue(DummyNat(res),"",QueryContext(null,null))
+      val sq = SubqueryValue(DummyNut(res),"",QueryContext(null,null))
       sq.eval.asArray must throwA[RuntimeException]
     }
     "1 row and multiple columns including null value" in {
@@ -87,7 +87,7 @@ class SubqueryValueTest extends Specification/* with BeforeAfterEach*/ {
       sb.add("THREE",Value.int64(2))
 
       val res = ResultSets.forRows(Type.struct(List(Type.StructField.of("ONE",Type.int64()),Type.StructField.of("TWO",Type.int64()),Type.StructField.of("THREE",Type.int64()) )),List(sb.build()))
-      val sq = SubqueryValue(DummyNat(res),"",QueryContext(null,null))
+      val sq = SubqueryValue(DummyNut(res),"",QueryContext(null,null))
       val arr = sq.eval.asArray
 
       arr.spannerType must_== Type.int64()
@@ -105,7 +105,7 @@ class SubqueryValueTest extends Specification/* with BeforeAfterEach*/ {
             }
             sb.build()
         }.toList)
-      val sq = SubqueryValue(DummyNat(res),"",QueryContext(null,null))
+      val sq = SubqueryValue(DummyNut(res),"",QueryContext(null,null))
       val arr = sq.eval.asArray
 
       arr.spannerType must_== Type.int64()
@@ -113,7 +113,7 @@ class SubqueryValueTest extends Specification/* with BeforeAfterEach*/ {
     }
     "0 column and 0 row" in {
       val res = ResultSets.forRows(Type.struct(List(Type.StructField.of("ONE",Type.int64()))),List())
-      val sq = SubqueryValue(DummyNat(res),"",QueryContext(null,null))
+      val sq = SubqueryValue(DummyNut(res),"",QueryContext(null,null))
       val arr = sq.eval.asArray
 
       arr.spannerType must_== null
@@ -124,7 +124,7 @@ class SubqueryValueTest extends Specification/* with BeforeAfterEach*/ {
       sb.add("ONE",Value.int64Array(Array(1L,2L,3L)))
 
       val res = ResultSets.forRows(Type.struct(List(Type.StructField.of("ONE",Type.array(Type.int64())) )),List(sb.build()))
-      val sq = SubqueryValue(DummyNat(res),"",QueryContext(null,null))
+      val sq = SubqueryValue(DummyNut(res),"",QueryContext(null,null))
       val arr = sq.eval.asArray
 
       arr.spannerType must_== Type.int64()
@@ -136,7 +136,7 @@ class SubqueryValueTest extends Specification/* with BeforeAfterEach*/ {
       sb.add("TWO",Value.int64Array(Array(1L,2L,3L)))
 
       val res = ResultSets.forRows(Type.struct(List(Type.StructField.of("ONE",Type.array(Type.int64())),Type.StructField.of("TWO",Type.array(Type.int64())) )),List(sb.build()))
-      val sq = SubqueryValue(DummyNat(res),"",QueryContext(null,null))
+      val sq = SubqueryValue(DummyNut(res),"",QueryContext(null,null))
       sq.eval.asArray must throwA[RuntimeException]
     }
     "1 array column and multiple rows" in {
@@ -147,7 +147,7 @@ class SubqueryValueTest extends Specification/* with BeforeAfterEach*/ {
             sb.add("ONE",Value.int64Array(Array(1L,2L,3L)))
             sb.build()
         }.toList)
-      val sq = SubqueryValue(DummyNat(res),"",QueryContext(null,null))
+      val sq = SubqueryValue(DummyNut(res),"",QueryContext(null,null))
       sq.eval.asArray must throwA[RuntimeException]
     }
   }

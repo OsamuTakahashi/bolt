@@ -13,7 +13,7 @@ class ResultIndexValueTest extends Specification {
     override def table(name: String): Option[Table] = tables.get(name)
   }
 
-  class DummyNat extends Bolt.Nat(null) {
+  class DummyNut extends Bolt.Nut(null) {
     private val _database = new DummyDatabase
     override def database: Database = _database
 
@@ -29,21 +29,21 @@ class ResultIndexValueTest extends Specification {
 
   "resolveReference" should {
     "from SubqueryValue at index 0" in {
-      val nat = new DummyNat
+      val nat = new DummyNut
       val qc = QueryContext(nat,null)
       val v = ResultIndexValue(SubqueryValue(nat,"SELECT *",qc),0)
       v.eval.asValue.isInstanceOf[IntValue] must_== true
       v.asValue.asInstanceOf[IntValue].value must_== 1
     }
     "from SubqueryValue at index 1" in {
-      val nat = new DummyNat
+      val nat = new DummyNut
       val qc = QueryContext(nat,null)
       val v = ResultIndexValue(SubqueryValue(nat,"SELECT *",qc),1)
       v.eval.asValue.isInstanceOf[IntValue] must_== true
       v.asValue.asInstanceOf[IntValue].value must_== 2
     }
     "out of range from SubqueryValue" in {
-      val nat = new DummyNat
+      val nat = new DummyNut
       val qc = QueryContext(nat,null)
       val v = ResultIndexValue(SubqueryValue(nat,"SELECT *",qc),3)
       v.eval.asValue must throwA[RuntimeException]

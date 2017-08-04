@@ -44,7 +44,7 @@ case class IdentifierValue(name:String,qc:QueryContext) extends WrappedValue {
         }
 
       case None =>
-        qc.currentTable.flatMap(tableName=>qc.nat.database.table(tableName).flatMap(_.columnIndexOf(name).map((tableName,_)))) match {
+        qc.currentTable.flatMap(tableName=>qc.nut.database.table(tableName).flatMap(_.columnIndexOf(name).map((tableName,_)))) match {
           case Some((tableName,idx)) =>
             val key = s"$tableName.$name"
             columns.get(key) match {
@@ -57,7 +57,7 @@ case class IdentifierValue(name:String,qc:QueryContext) extends WrappedValue {
             }
 
           case None =>
-            qc.nat.database.table(name) match {
+            qc.nut.database.table(name) match {
               case Some(tbl) =>
                 _ref = Some(TableValue(name,qc))
               case None =>

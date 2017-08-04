@@ -9,7 +9,7 @@ import org.specs2.specification.BeforeAfterEach
 /**
   * Created by takahashi on 2017/03/29.
   */
-class NatTest extends Specification with BeforeAfterEach {
+class NutTest extends Specification with BeforeAfterEach {
   sequential
 
   import Bolt._

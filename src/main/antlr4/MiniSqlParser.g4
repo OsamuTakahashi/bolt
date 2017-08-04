@@ -12,7 +12,7 @@ import com.sopranoworks.bolt.values.*;
 }
 
 @members {
-    Bolt.Nat nat = null;
+    Bolt.Nut nut = null;
     Admin admin = null;
     String currentTable = null;
     String instanceId = null;
@@ -29,17 +29,17 @@ stmt returns [ ResultSet resultSet = null ]
         : insert_stmt { $resultSet = $insert_stmt.resultSet; }
         | update_stmt { $resultSet = $update_stmt.resultSet; }
         | delete_stmt { $resultSet = $delete_stmt.resultSet; }
-        | query_stmt { $resultSet = nat.executeNativeQuery($query_stmt.text); }
+        | query_stmt { $resultSet = nut.executeNativeQuery($query_stmt.text); }
         | create_stmt {
             if ($create_stmt.isNativeQuery) {
               if ($create_stmt.qtext != null)
-                nat.executeNativeAdminQuery(admin,$create_stmt.qtext);
+                nut.executeNativeAdminQuery(admin,$create_stmt.qtext);
               else
-                nat.executeNativeAdminQuery(admin,$create_stmt.text);
+                nut.executeNativeAdminQuery(admin,$create_stmt.text);
             }
           }
-        | alter_stmt  { nat.executeNativeAdminQuery(admin,$alter_stmt.text); }
-        | drop_stmt { nat.executeNativeAdminQuery(admin,$drop_stmt.text); }
+        | alter_stmt  { nut.executeNativeAdminQuery(admin,$alter_stmt.text); }
+        | drop_stmt { nut.executeNativeAdminQuery(admin,$drop_stmt.text); }
         | show_stmt { $resultSet = $show_stmt.resultSet; }
         | use_stmt
         | /* empty */ { $resultSet = lastResultSet; }
@@ -50,8 +50,8 @@ query_stmt returns [ Value v = null ]
         ;
 
 query_expr returns [ QueryContext q = null, SubqueryValue v = null, int columns = 0 ]
-        : { qc = new QueryContext(nat,qc); $q = qc; }  ( query_expr_elem { $columns = $query_expr_elem.columns; } | query_expr_elem { $columns = $query_expr_elem.columns; } set_op query_expr )(ORDER BY expression (ASC|DESC)? (',' expression (ASC|DESC)? )* )? ( LIMIT count ( OFFSET skip_rows )? )? {
-              $v = new SubqueryValue(nat,$query_expr.text,qc,$columns);
+        : { qc = new QueryContext(nut,qc); $q = qc; }  ( query_expr_elem { $columns = $query_expr_elem.columns; } | query_expr_elem { $columns = $query_expr_elem.columns; } set_op query_expr )(ORDER BY expression (ASC|DESC)? (',' expression (ASC|DESC)? )* )? ( LIMIT count ( OFFSET skip_rows )? )? {
+              $v = new SubqueryValue(nut,$query_expr.text,qc,$columns);
               qc = qc.parent();
             }
         ;
@@ -171,7 +171,7 @@ atom returns [ Value v = null ]
         | array_expression { $v = $array_expression.v; }
         | cast_expression  { $v = $cast_expression.v; }
         | '(' expression ')' { $v = $expression.v; }
-        | '(' query_expr ')' { $v = new SubqueryValue(nat,$query_expr.text,$query_expr.q,$query_expr.columns);$query_expr.q.setSubquery((SubqueryValue)$v); }
+        | '(' query_expr ')' { $v = new SubqueryValue(nut,$query_expr.text,$query_expr.q,$query_expr.columns);$query_expr.q.setSubquery((SubqueryValue)$v); }
         ;
 
 array_path returns [ Value v = null ]
@@ -252,7 +252,7 @@ array_expression
           }
         | ARRAY '(' query_expr ')' {
             List<Value> p = new ArrayList<Value>();
-            p.add(new SubqueryValue(nat,$query_expr.text,$query_expr.q,$query_expr.columns));
+            p.add(new SubqueryValue(nut,$query_expr.text,$query_expr.q,$query_expr.columns));
 //            $query_expr.q.setSubquery($v);
             $v = new FunctionValue("\$ARRAY",p);
           }
@@ -303,27 +303,27 @@ insert_stmt returns [ ResultSet resultSet = null ]
               List<String> columns = new ArrayList<String>(),
               List< List<Value> > bulkValues = new ArrayList<List<Value>>()
             ]
-        : INSERT { qc = new QueryContext(nat,qc); } INTO? tbl=ID (AS? alias)? ( '(' ID { $columns.add($ID.text); } (',' ID { $columns.add($ID.text); } )*  ')' )?
+        : INSERT { qc = new QueryContext(nut,qc); } INTO? tbl=ID (AS? alias)? ( '(' ID { $columns.add($ID.text); } (',' ID { $columns.add($ID.text); } )*  ')' )?
             VALUES values {
               if ($columns.size() == 0)
-                nat.insert($tbl.text,$values.valueList);
+                nut.insert($tbl.text,$values.valueList);
               else
-                nat.insert($tbl.text,$columns,$values.valueList);
+                nut.insert($tbl.text,$columns,$values.valueList);
               qc = qc.parent();
             }
-        | INSERT { ;qc = new QueryContext(nat,qc); } INTO? tbl=ID (AS? alias)? ( '(' ID { $columns.add($ID.text); } (',' ID { $columns.add($ID.text); } )*  ')' )?
+        | INSERT { ;qc = new QueryContext(nut,qc); } INTO? tbl=ID (AS? alias)? ( '(' ID { $columns.add($ID.text); } (',' ID { $columns.add($ID.text); } )*  ')' )?
             VALUES values { $bulkValues.add($values.valueList); } (',' values { $bulkValues.add($values.valueList); }) + {
               if ($columns.size() == 0)
-                nat.bulkInsert($tbl.text,$bulkValues);
+                nut.bulkInsert($tbl.text,$bulkValues);
               else
-                nat.bulkInsert($tbl.text,$columns,$bulkValues);
+                nut.bulkInsert($tbl.text,$columns,$bulkValues);
               qc = qc.parent();
             }
-        | INSERT { qc = new QueryContext(nat,qc); } INTO? tbl=ID (AS? alias)? ( '(' ID { $columns.add($ID.text); } (',' ID { $columns.add($ID.text); } )*  ')' )? query_expr {
+        | INSERT { qc = new QueryContext(nut,qc); } INTO? tbl=ID (AS? alias)? ( '(' ID { $columns.add($ID.text); } (',' ID { $columns.add($ID.text); } )*  ')' )? query_expr {
             if ($columns.size() == 0)
-              nat.insertSelect($tbl.text,$query_expr.v);
+              nut.insertSelect($tbl.text,$query_expr.v);
             else
-              nat.insertSelect($tbl.text,$columns,$query_expr.v);
+              nut.insertSelect($tbl.text,$columns,$query_expr.v);
           }
         ;
 
@@ -333,22 +333,22 @@ update_stmt
               List<KeyValue> kvs = new ArrayList<KeyValue>(),
               List<String> columns = new ArrayList<String>()
             ]
-        : UPDATE { qc = new QueryContext(nat,qc); } table_name { currentTable = $table_name.text;qc.setCurrentTable($table_name.text); } (AS? alias { qc.addAlias(new TableAlias($alias.text,$table_name.text)); })?
+        : UPDATE { qc = new QueryContext(nut,qc); } table_name { currentTable = $table_name.text;qc.setCurrentTable($table_name.text); } (AS? alias { qc.addAlias(new TableAlias($alias.text,$table_name.text)); })?
             SET ID EQ expression { $kvs.add(new KeyValue($ID.text,$expression.v)); } ( ',' ID EQ expression { $kvs.add(new KeyValue($ID.text,$expression.v)); } )*
             where_stmt ( LIMIT ln=INT_VAL )? {
-              nat.update(currentTable,$kvs,$where_stmt.where);
+              nut.update(currentTable,$kvs,$where_stmt.where);
               qc = qc.parent();
             }
-        | UPDATE { qc = new QueryContext(nat,qc); } table_name { currentTable = $table_name.text; } (AS? alias { qc.addAlias(new TableAlias($alias.text,$table_name.text)); })?
+        | UPDATE { qc = new QueryContext(nut,qc); } table_name { currentTable = $table_name.text; } (AS? alias { qc.addAlias(new TableAlias($alias.text,$table_name.text)); })?
             SET '(' ID { $columns.add($ID.text); } (',' ID { $columns.add($ID.text); })* ')' EQ '(' query_expr ')' where_stmt ( LIMIT ln=INT_VAL )? {
-              nat.update(currentTable, $columns, $query_expr.v, $where_stmt.where);
+              nut.update(currentTable, $columns, $query_expr.v, $where_stmt.where);
             }
         ;
 
 delete_stmt returns [ ResultSet resultSet = null ]
             locals [ Where where = null ]
-        : DELETE { qc = new QueryContext(nat,qc); } FROM ID { currentTable = $ID.text; } (where_stmt { $where = $where_stmt.where; })? {
-            nat.delete(currentTable,$where);
+        : DELETE { qc = new QueryContext(nut,qc); } FROM ID { currentTable = $ID.text; } (where_stmt { $where = $where_stmt.where; })? {
+            nut.delete(currentTable,$where);
             qc = qc.parent();
           }
         ;
@@ -357,7 +357,7 @@ create_stmt returns [ Boolean isNativeQuery = true, String qtext = null ]
             locals [ Boolean ifNotExists = false ]
         : CREATE TABLE (IF NOT EXISTS { $ifNotExists = true;})? create_table {
             if ($ifNotExists) {
-              $isNativeQuery = !nat.tableExists($create_table.name);
+              $isNativeQuery = !nut.tableExists($create_table.name);
               if ($isNativeQuery) {
                 $qtext = "CREATE TABLE " + $create_table.text;
               }
@@ -367,22 +367,22 @@ create_stmt returns [ Boolean isNativeQuery = true, String qtext = null ]
           }
         | CREATE uq=UNIQUE? nf=NULL_FILTERED? INDEX (IF NOT EXISTS { $ifNotExists = true;})? create_index {
             if ($ifNotExists) {
-              $isNativeQuery = !nat.indexExists($create_index.tableName,$create_index.indexName);
+              $isNativeQuery = !nut.indexExists($create_index.tableName,$create_index.indexName);
               if ($isNativeQuery) {
                 $qtext = "CREATE " + ($uq != null ? "UNIQUE " : "") + ($nf != null ? "NULL_FILTERED " : "") + " INDEX " + $create_index.text;
               }
             } else {
               $isNativeQuery = true;
             }
-//            $isNativeQuery = ($ifNotExists) ? !nat.indexExists($create_index.tableName,$create_index.indexName) : true;
+//            $isNativeQuery = ($ifNotExists) ? !nut.indexExists($create_index.tableName,$create_index.indexName) : true;
           }
         | CREATE DATABASE ID {
             $isNativeQuery = false;
-            nat.createDatabase(admin,instanceId,$ID.text);
+            nut.createDatabase(admin,instanceId,$ID.text);
           }
         ;
 
-use_stmt: USE ID { nat.changeDatabase($ID.text); }
+use_stmt: USE ID { nut.changeDatabase($ID.text); }
         ;
 
 create_table returns [ String name = null ]
@@ -458,19 +458,19 @@ drop_stmt
 show_stmt returns [ ResultSet resultSet = null ]
         : SHOW ID {
             if ($ID.text.equalsIgnoreCase("TABLES")) {
-              $resultSet = nat.showTables();
+              $resultSet = nut.showTables();
             } else
             if ($ID.text.equalsIgnoreCase("DATABASES")) {
-              $resultSet = nat.showDatabases(admin,instanceId);
+              $resultSet = nut.showDatabases(admin,instanceId);
             } else {
               // exception
               throw new RuntimeException("Unknown token:" + $ID.text);
             }
           }
-        | SHOW (FULL)? ID { if (!$ID.text.equalsIgnoreCase("COLUMNS")) throw new RuntimeException("Unknown token:" + $ID.text); } (FROM|IN) ID  { $resultSet = nat.showColumns($ID.text); }
-        | (DESC|DESCRIBE) ID  { $resultSet = nat.showColumns($ID.text); }
-        | SHOW CREATE TABLE ID { $resultSet = nat.showCreateTable($ID.text); }
-        | SHOW INDEX (FROM|IN) ID { $resultSet = nat.showIndexes($ID.text); }
+        | SHOW (FULL)? ID { if (!$ID.text.equalsIgnoreCase("COLUMNS")) throw new RuntimeException("Unknown token:" + $ID.text); } (FROM|IN) ID  { $resultSet = nut.showColumns($ID.text); }
+        | (DESC|DESCRIBE) ID  { $resultSet = nut.showColumns($ID.text); }
+        | SHOW CREATE TABLE ID { $resultSet = nut.showCreateTable($ID.text); }
+        | SHOW INDEX (FROM|IN) ID { $resultSet = nut.showIndexes($ID.text); }
         ;
 
 scalar_value  returns [ Value v = null ]

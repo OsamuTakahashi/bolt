@@ -36,7 +36,7 @@ It uses implicit conversion.
 You can use it as explicitly like this.
 
 ```scala
-Nat(dbClient).executeQuery("INSERT INTO test_tbl01 VALUES(103,'test insert');")
+Nut(dbClient).executeQuery("INSERT INTO test_tbl01 VALUES(103,'test insert');")
 
 ```
 
@@ -82,8 +82,8 @@ dbClient.executeQuery("SELECT * FROM test_tbl01").autoclose(
 ```java
 import com.sopranoworks.bolt.Bolt;
 
-Bolt.Nat nat = Bolt.Nat(client);
-nat.executeQuery("INSERT INTO TEST_TABLE (ID,NAME) VALUES(101,'test');");
+Bolt.Nut nut = Bolt.Nut(client);
+nut.executeQuery("INSERT INTO TEST_TABLE (ID,NAME) VALUES(101,'test');");
 ```
 
 ### spanner-cli
@@ -105,7 +105,7 @@ MD5:11dd5f474992ebe3399205fc3a328c00
 
 ## Notice
 
-A Nat instance is not thread safe.
+A Nut instance is not thread safe.
 You must create a instance per thread.
 
 

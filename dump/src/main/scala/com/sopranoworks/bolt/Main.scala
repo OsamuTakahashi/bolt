@@ -101,7 +101,7 @@ object Main extends App {
     arg[String]("table").optional().action((x,c) => c.copy(table = Some(x)))
   }
 
-  def dumpTable(dbClient:DatabaseClient,nat:Nat,tbl:String):Unit = {
+  def dumpTable(dbClient:DatabaseClient, nat:Nut, tbl:String):Unit = {
     makeResult(nat.showCreateTable(tbl)).foreach(row=>println(row.map(_.init.tail).mkString("")))
     var loop = true
     var offset = 0
@@ -134,14 +134,14 @@ object Main extends App {
       }
       var admin = Admin(spanner.getDatabaseAdminClient, instance, dbName)
       var dbClient = spanner.getDatabaseClient(DatabaseId.of(options.getProjectId, instance, dbName))
-      val nat = Nat(dbClient)
+      val nut = Nut(dbClient)
 
       cfg.table match {
         case Some(tbl) =>
-          dumpTable(dbClient,nat,tbl)
+          dumpTable(dbClient,nut,tbl)
         case None =>
           val tbls = makeResult(dbClient.singleUse().executeQuery(Statement.of("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA=\"\"")))
-          tbls.foreach(tbl=>dumpTable(dbClient,nat,tbl.head.init.tail))
+          tbls.foreach(tbl=>dumpTable(dbClient,nut,tbl.head.init.tail))
       }
       spanner.close()
   }

@@ -15,6 +15,12 @@ import com.google.cloud.spanner.{Mutation, Type}
 
 import scala.collection.JavaConversions._
 
+/**
+  *
+  * @param values
+  * @param evaluated
+  * @param arrayType
+  */
 case class ArrayValue(var values:java.util.List[Value],var evaluated:Boolean = false,var arrayType:Type = null) extends Value with LiteralValue {
   private var _evaluated = List.empty[Value]
   private var _stayUnresolved = false

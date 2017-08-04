@@ -34,7 +34,7 @@ object Bolt {
     * @note This class is NOT THREAD SAFE!
     * @param dbClient A database clinet
     */
-  implicit class Nat(val dbClient: DatabaseClient) {
+  implicit class Nut(val dbClient: DatabaseClient) {
     private var _transactionContext: Option[TransactionContext] = None
     private var _mutations = List.empty[Mutation]
 
@@ -55,7 +55,7 @@ object Bolt {
       val tokenStream = new CommonTokenStream(lexer)
       val parser = new MiniSqlParser(tokenStream)
       parser.setErrorHandler(new BailErrorStrategy())
-      parser.nat = this
+      parser.nut = this
       parser.admin = admin
       parser.instanceId = instanceId
 //        parser.removeErrorListeners()
@@ -542,7 +542,7 @@ object Bolt {
       * @tparam T The result type
       * @return Some result of type T
       */
-    def beginTransaction[T](f:Nat => T):T = {
+    def beginTransaction[T](f:Nut => T):T = {
       val self = this
       dbClient.readWriteTransaction()
         .run(new TransactionCallable[T] {
@@ -567,7 +567,7 @@ object Bolt {
       * @tparam T The result type
       * @return Some result of type T
       */
-    def beginTransaction[T](f:Nat => T,default:T):T = {
+    def beginTransaction[T](f:Nut => T, default:T):T = {
       val self = this
       dbClient.readWriteTransaction()
         .run(new TransactionCallable[T] {
@@ -608,7 +608,7 @@ object Bolt {
   }
 
   trait Transaction[T] {
-    def run(nat:Nat):T
+    def run(nat:Nut):T
   }
 
 

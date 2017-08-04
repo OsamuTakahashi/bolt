@@ -15,7 +15,7 @@ import java.io.ByteArrayInputStream
 import java.util
 
 import com.google.cloud.spanner.{DatabaseClient, ResultSet}
-import com.sopranoworks.bolt.Bolt.Nat
+import com.sopranoworks.bolt.Bolt.Nut
 import com.sopranoworks.bolt.values._
 import org.antlr.v4.runtime.{ANTLRInputStream, BailErrorStrategy, CommonTokenStream}
 import org.specs2.mutable.Specification
@@ -31,7 +31,7 @@ class MiniSqlParserTest extends Specification {
     override def table(name: String): Option[Table] = tables.get(name)
   }
   
-  class DummyNat(dbClient:DatabaseClient = null) extends Nat(dbClient) {
+  class DummyNut(dbClient:DatabaseClient = null) extends Nut(dbClient) {
     private val _database = new DummyDatabase
     override def database: Database = _database
 
@@ -67,9 +67,9 @@ class MiniSqlParserTest extends Specification {
     val lexer = new MiniSqlLexer(input)
     val tokenStream = new CommonTokenStream(lexer)
     val parser = new MiniSqlParser(tokenStream)
-    val nat = new DummyNat()
+    val nat = new DummyNut()
     parser.setErrorHandler(new BailErrorStrategy())
-    parser.nat = nat
+    parser.nut = nat
     (parser,nat)
   }
 

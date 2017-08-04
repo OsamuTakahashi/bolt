@@ -34,7 +34,7 @@ case class Where(qc:QueryContext,var tableName:String,whereStmt:String,boolExpre
       ex  <- Option(boolExpression)
       _   <- Option(qc)
       tn  <- Option(tableName).orElse(qc.currentTable)
-      tbl <- qc.nat.database.table(tn)
+      tbl <- qc.nut.database.table(tn)
     } {
       val k = ex.resolveReference().values
       if (k.size == tbl.primaryKey.columns.length &&

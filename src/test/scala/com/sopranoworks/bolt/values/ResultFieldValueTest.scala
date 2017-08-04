@@ -13,7 +13,7 @@ class ResultFieldValueTest extends Specification {
     override def table(name: String): Option[Table] = tables.get(name)
   }
 
-  class DummyNat extends Bolt.Nat(null) {
+  class DummyNut extends Bolt.Nut(null) {
     private val _database = new DummyDatabase
     override def database: Database = _database
 
@@ -29,21 +29,21 @@ class ResultFieldValueTest extends Specification {
 
   "resolveReference" should {
     "ONE from SubqueryValue" in {
-      val nat = new DummyNat
+      val nat = new DummyNut
       val qc = QueryContext(nat,null)
       val v = ResultFieldValue(SubqueryValue(nat,"SELECT *",qc),"ONE")
       v.eval.asValue.isInstanceOf[IntValue] must_== true
       v.asValue.asInstanceOf[IntValue].value must_== 1
     }
     "TWO from SubqueryValue" in {
-      val nat = new DummyNat
+      val nat = new DummyNut
       val qc = QueryContext(nat,null)
       val v = ResultFieldValue(SubqueryValue(nat,"SELECT *",qc),"TWO")
       v.eval.asValue.isInstanceOf[IntValue] must_== true
       v.asValue.asInstanceOf[IntValue].value must_== 2
     }
     "Could not found from SubqueryValue" in {
-      val nat = new DummyNat
+      val nat = new DummyNut
       val qc = QueryContext(nat,null)
       val v = ResultFieldValue(SubqueryValue(nat,"SELECT *",qc),"FOUR")
       v.eval.asValue must throwA[RuntimeException]

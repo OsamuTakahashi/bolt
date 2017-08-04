@@ -12,7 +12,7 @@
 package com.sopranoworks.bolt.values
 
 import com.google.cloud.spanner.{Mutation, Struct, Type}
-import com.sopranoworks.bolt.Bolt.Nat
+import com.sopranoworks.bolt.Bolt.Nut
 import com.sopranoworks.bolt.{Bolt, QueryContext, QueryResultAlias}
 
 import scala.collection.JavaConverters._
@@ -24,7 +24,7 @@ import scala.collection.JavaConversions._
   * @param subquery a subquery
   * @param qc a query context
   */
-case class SubqueryValue(nat:Nat,subquery:String,qc:QueryContext,expectedColumns:Int = 0) extends Value {
+case class SubqueryValue(nat:Nut, subquery:String, qc:QueryContext, expectedColumns:Int = 0) extends Value {
   import Bolt._
 
   private var _result:Option[List[Struct]] = None

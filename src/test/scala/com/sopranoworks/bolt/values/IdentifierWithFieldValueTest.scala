@@ -13,7 +13,7 @@ class IdentifierWithFieldValueTest extends Specification {
     override def table(name: String): Option[Table] = tables.get(name)
   }
 
-  class DummyNat extends Bolt.Nat(null) {
+  class DummyNut extends Bolt.Nut(null) {
     private val _database = new DummyDatabase
     override def database: Database = _database
 
@@ -38,7 +38,7 @@ class IdentifierWithFieldValueTest extends Specification {
         List(Column("x",0,"INT64",false),Column("y",1,"INT64",false),Column("y",2,"INT64",false)),
         Index("PRIMARY_KEY",List(IndexColumn("x",0,"INT64",false,"ASC"))),
         Map.empty[String,Index])
-      val nat = new DummyNat
+      val nat = new DummyNut
       nat.database.asInstanceOf[DummyDatabase].tables += ("TEST_TABLE"->tbl)
       val qc = QueryContext(nat,null)
 
@@ -48,7 +48,7 @@ class IdentifierWithFieldValueTest extends Specification {
       v().asInstanceOf[TableColumnValue].text must_== "TEST_TABLE.x"
     }
     "subquery field name" in {
-      val nat = new DummyNat
+      val nat = new DummyNut
       val qc = QueryContext(nat,null)
       qc.setSubquery(SubqueryValue(nat,"SELECT *",qc))
       qc.addAlias(ExpressionAlias("x",qc.subquery.get))
@@ -67,7 +67,7 @@ class IdentifierWithFieldValueTest extends Specification {
       st.addFieldName("TWO",1)
       st.addFieldName("THREE",2)
 
-      val nat = new DummyNat
+      val nat = new DummyNut
       val qc = QueryContext(nat,null)
       qc.addAlias(ExpressionAlias("x",st))
 
@@ -81,7 +81,7 @@ class IdentifierWithFieldValueTest extends Specification {
         List(Column("x",0,"INT64",false),Column("y",1,"INT64",false),Column("y",2,"INT64",false)),
         Index("PRIMARY_KEY",List(IndexColumn("x",0,"INT64",false,"ASC"))),
         Map.empty[String,Index])
-      val nat = new DummyNat
+      val nat = new DummyNut
       nat.database.asInstanceOf[DummyDatabase].tables += ("TEST_TABLE"->tbl)
       val qc = QueryContext(nat,null)
       qc.addAlias(new TableAlias("T","TEST_TABLE"))

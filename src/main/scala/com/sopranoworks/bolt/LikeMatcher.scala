@@ -13,6 +13,9 @@ package com.sopranoworks.bolt
 
 import scala.util.matching.Regex
 
+/**
+  * A conversion utility from SQL LIKE expression to regular expression
+  */
 object LikeMatcher {
   def apply(matching:String):Regex = {
     var e = false

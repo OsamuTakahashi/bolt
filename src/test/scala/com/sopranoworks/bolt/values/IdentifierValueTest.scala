@@ -14,7 +14,7 @@ class IdentifierValueTest extends Specification {
     override def table(name: String): Option[Table] = tables.get(name)
   }
 
-  class DummyNat extends Bolt.Nat(null) {
+  class DummyNut extends Bolt.Nut(null) {
     private val _database = new DummyDatabase
     override def database: Database = _database
 
@@ -30,7 +30,7 @@ class IdentifierValueTest extends Specification {
 
   "resolveReference" should {
     "is TableAlias" in {
-      val nat = new DummyNat
+      val nat = new DummyNut
       val qc = QueryContext(nat,null)
       qc.addAlias(TableAlias("T","TEST_TABLE"))
 
@@ -40,7 +40,7 @@ class IdentifierValueTest extends Specification {
       v.asValue.asInstanceOf[TableValue].name must_== "TEST_TABLE"
     }
     "is QueryResultAlias " in {
-      val nat = new DummyNat
+      val nat = new DummyNut
       val qc = QueryContext(nat,null)
       qc.setSubquery(SubqueryValue(nat,"SELECT *",qc))
       qc.addAlias(QueryResultAlias("x",0,qc))
@@ -52,7 +52,7 @@ class IdentifierValueTest extends Specification {
       v.asValue.asInstanceOf[IntValue].value must_== 1
     }
     "is QueryResultAlias without subquery" in {
-      val nat = new DummyNat
+      val nat = new DummyNut
       val qc = QueryContext(nat,null)
       qc.addAlias(QueryResultAlias("x",0,qc))
 
@@ -62,7 +62,7 @@ class IdentifierValueTest extends Specification {
       v.asValue must_== NullValue
     }
     "is ExpressionAlias" in {
-      val nat = new DummyNat
+      val nat = new DummyNut
       val qc = QueryContext(nat,null)
       qc.addAlias(ExpressionAlias("x",ExpressionValue("+",IntValue("1",1,true),IntValue("2",2,true))))
 
@@ -77,7 +77,7 @@ class IdentifierValueTest extends Specification {
         List(Column("x",0,"INT64",false),Column("y",1,"INT64",false),Column("y",2,"INT64",false)),
         Index("PRIMARY_KEY",List(IndexColumn("x",0,"INT64",false,"ASC"))),
         Map.empty[String,Index])
-      val nat = new DummyNat
+      val nat = new DummyNut
       nat.database.asInstanceOf[DummyDatabase].tables += ("TEST_TABLE"->tbl)
       val qc = QueryContext(nat,null)
       qc.setCurrentTable("TEST_TABLE")
@@ -92,7 +92,7 @@ class IdentifierValueTest extends Specification {
         List(Column("x",0,"INT64",false),Column("y",1,"INT64",false),Column("y",2,"INT64",false)),
         Index("PRIMARY_KEY",List(IndexColumn("x",0,"INT64",false,"ASC"))),
         Map.empty[String,Index])
-      val nat = new DummyNat
+      val nat = new DummyNut
       nat.database.asInstanceOf[DummyDatabase].tables += ("TEST_TABLE"->tbl)
       val qc = QueryContext(nat,null)
       qc.setCurrentTable("TEST_TABLE")
@@ -116,7 +116,7 @@ class IdentifierValueTest extends Specification {
         List(Column("x",0,"INT64",false),Column("y",1,"INT64",false),Column("y",2,"INT64",false)),
         Index("PRIMARY_KEY",List(IndexColumn("x",0,"INT64",false,"ASC"))),
         Map.empty[String,Index])
-      val nat = new DummyNat
+      val nat = new DummyNut
       nat.database.asInstanceOf[DummyDatabase].tables += ("TEST_TABLE"->tbl)
       val qc = QueryContext(nat,null)
       
