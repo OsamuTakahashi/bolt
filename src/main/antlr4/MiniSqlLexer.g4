@@ -66,6 +66,9 @@ DROP    : D R O P
 EXISTS  : E X I S T S
         ;
 
+EXTRACT : E X T R A C T
+        ;
+
 GROUP   : G R O U P
         ;
 
@@ -79,6 +82,9 @@ IF      : I F
         ;
 
 INSERT  : I N S E R T
+        ;
+
+INTERVAL: I N T E R V A L
         ;
 
 INTO    : I N T O

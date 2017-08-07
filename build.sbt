@@ -41,7 +41,7 @@ parallelExecution in ThisBuild := false
 
 fork in run := true
 
-val projectVersion = "0.14"
+val projectVersion = "0.15-SNAPSHOT"
 
 val noJavaDoc = Seq(
   publishArtifact in (Compile, packageDoc) := false,
@@ -58,7 +58,6 @@ lazy val core = (project in file("."))
     name := "bolt",
     organization := "com.sopranoworks",
     version := projectVersion,
-    publishTo := Some(Resolver.file("bolt",file("../RustyRaven.github.io"))(Patterns(true, Resolver.mavenStyleBasePattern))),
     antlr4PackageName in Antlr4 := Some("com.sopranoworks.bolt"),
     libraryDependencies ++=
       spannerClientLibraries ++
@@ -66,9 +65,27 @@ lazy val core = (project in file("."))
       loggingLibraries ++
       testLibraries ++
       commonLibraries,
-    dependencyOverrides += "io.netty" % "netty-tcnative-boringssl-static" % "1.1.33.Fork22"  // for SIGILL hack on old intel CPUs
+    dependencyOverrides += "io.netty" % "netty-tcnative-boringssl-static" % "1.1.33.Fork22",  // for SIGILL hack on old intel CPUs
+    pomExtra :=
+      <url>https://github.com/OsamuTakahashi/bolt</url>
+        <licenses>
+          <license>
+            <name>MIT</name>
+            <url>https://opensource.org/licenses/MIT</url>
+          </license>
+        </licenses>
+        <scm>
+          <url>https://github.com/OsamuTakahashi/bolt</url>
+          <connection>https://github.com/OsamuTakahashi/bolt.git</connection>
+        </scm>
+        <developers>
+          <developer>
+            <id>OsamuTakahashi</id>
+            <name>Osamu Takahashi</name>
+            <url>https://github.com/OsamuTakahashi/</url>
+          </developer>
+        </developers>
   )
-  .settings(noJavaDoc: _*)
 
 lazy val client = (project in file("client"))
   .enablePlugins(JavaAppPackaging,UniversalPlugin)

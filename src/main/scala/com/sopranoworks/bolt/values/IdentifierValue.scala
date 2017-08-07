@@ -61,7 +61,8 @@ case class IdentifierValue(name:String,qc:QueryContext) extends WrappedValue {
               case Some(tbl) =>
                 _ref = Some(TableValue(name,qc))
               case None =>
-                throw new RuntimeException(s"Unresolvable identifier $name")
+                // Error will occure only at realize value with asValue
+                //throw new RuntimeException(s"Unresolvable identifier $name")
             }
         }
     }

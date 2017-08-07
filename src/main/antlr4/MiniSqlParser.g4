@@ -484,6 +484,7 @@ scalar_literal  returns [ Value v = null ]
         | INT_VAL { $v = new IntValue($INT_VAL.text,0,false); }
         | DBL_VAL { $v = new DoubleValue($DBL_VAL.text,0,false); }
         | bool_or_null_value { $v = $bool_or_null_value.v; }
+        | datetime_value { $v = $datetime_value.v; }
         ;
 
 bool_or_null_value returns [ Value v = null ]
@@ -496,6 +497,13 @@ bool_value  returns [ Value v = null ]
         | FALSE { $v = new BooleanValue(false); }
         ;
 
+datetime_value  returns [ Value v = null ]
+        : DATE STRING { $v = new DateValue($STRING.text.substring(1,$STRING.text.length() - 1),null); }
+        | TIMESTAMP STRING { $v = new TimestampValue($STRING.text.substring(1,$STRING.text.length() - 1),null); }
+        | INTERVAL INT_VAL ID { $v = new IntervalValue(Integer.parseInt($INT_VAL.text),$ID.text); }
+        ;
+
+
 null_value returns [ Value v = null ]
         : NULL { $v = NullValue$.MODULE$; }
         ;
@@ -507,8 +515,11 @@ struct_value returns [ StructValue v = null; ]
 
 function returns [ Value v = null ]
         locals [ List<Value> vlist = new ArrayList<Value>(), String name = null ]
-        : (ID { $name = $ID.text; }|IF { $name="IF"; }) '(' (MUL | expression { $vlist.add($expression.v); } (',' expression { $vlist.add($expression.v); })* )? ')' {
+        : (ID { $name = $ID.text; }| IF { $name="IF"; }| DATE { $name="DATE"; }) '(' (MUL | expression { $vlist.add($expression.v); } (',' expression { $vlist.add($expression.v); })* )? ')' {
             $v = new FunctionValue($name.toUpperCase(),$vlist);
+          }
+        | EXTRACT '(' ID FROM expression ')' {
+            $v = new ResultFieldValue($expression.v,$ID.text);
           }
         ;
 
