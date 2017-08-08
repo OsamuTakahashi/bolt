@@ -38,7 +38,7 @@ object Bolt {
     private var _transactionContext: Option[TransactionContext] = None
     private var _mutations = List.empty[Mutation]
 
-    def transactionContext = _transactionContext
+    def transactionContext: Option[TransactionContext] = _transactionContext
 
     def database = Database(dbClient)
 
@@ -137,7 +137,7 @@ object Bolt {
     }
 
     def bulkInsert(tableName:String,values:java.util.List[java.util.List[Value]]):Unit = {
-      val m = Mutation.newInsertBuilder(tableName)
+//      val m = Mutation.newInsertBuilder(tableName)
       val columns = _tableColumns(tableName)
       val mm = values.map {
         v =>
@@ -332,7 +332,7 @@ object Bolt {
       }
     }
 
-    private def _updateSelect(tableName: String, columns:java.util.List[String], subquery: SubqueryValue, where: Where, tr: TransactionContext) = {
+    private def _updateSelect(tableName: String, columns:java.util.List[String], subquery: SubqueryValue, where: Where, tr: TransactionContext):Unit = {
       val tbl = database.table(tableName).get
       tbl.primaryKey.columns.foreach(k => if (columns.contains(k.name)) throw new RuntimeException(s"${k.name} is primary key"))
 
@@ -393,29 +393,37 @@ object Bolt {
         case Some(Where(_,_,w,_)) =>
           _transactionContext match {
             case Some(tr) =>
-              val keys = _getTargetKeys(tr,tableName,w)
-              if (keys.nonEmpty) {
-                val ml = keys.map {
-                  k =>
-                    Mutation.delete(tableName,Key.of(k:_*))
+              if (where.isOptimizedWhere) {
+                _mutations :+= where.asDeleteMutation
+              } else {
+                val keys = _getTargetKeys(tr, tableName, w)
+                if (keys.nonEmpty) {
+                  val ml = keys.map {
+                    k =>
+                      Mutation.delete(tableName, Key.of(k: _*))
+                  }
+                  _mutations ++= ml
                 }
-                _mutations ++= ml
               }
 
             case _ =>
-              Option(dbClient).foreach(_.readWriteTransaction()
-                .run(new TransactionCallable[Unit] {
-                  override def run(transaction: TransactionContext):Unit = {
-                    val keys = _getTargetKeys(transaction,tableName,w)
-                    if (keys.nonEmpty) {
-                      val ml = keys.map {
-                        k =>
-                          Mutation.delete(tableName,Key.of(k:_*))
+              if (where.isOptimizedWhere) {
+                Option(dbClient).foreach(_.write(List(where.asDeleteMutation)))
+              } else {
+                Option(dbClient).foreach(_.readWriteTransaction()
+                  .run(new TransactionCallable[Unit] {
+                    override def run(transaction: TransactionContext):Unit = {
+                        val keys = _getTargetKeys(transaction, tableName, w)
+                        if (keys.nonEmpty) {
+                          val ml = keys.map {
+                            k =>
+                              Mutation.delete(tableName, Key.of(k: _*))
+                          }
+                          transaction.buffer(ml)
+                        }
                       }
-                      transaction.buffer(ml)
                     }
-                  }
-                }))
+                  ))}
           }
 
         case None =>
@@ -429,8 +437,8 @@ object Bolt {
 
     def createDatabase(admin:Admin,instanceId:String,databaseName:String):Boolean = {
       (Option(admin),Option(instanceId)) match {
-        case (Some(admin),Some(iid)) =>
-          val r = admin.adminClient.createDatabase(iid,databaseName,List.empty[String].asJava).waitFor()
+        case (Some(adm),Some(iid)) =>
+          val r = adm.adminClient.createDatabase(iid,databaseName,List.empty[String].asJava).waitFor()
           r.isSuccessful
         case _ =>
           false
@@ -620,7 +628,7 @@ object Bolt {
   }
 
   implicit class Washer(resultSet: ResultSet) {
-    def iterator = resultSetToIterator(resultSet)
+    def iterator:Iterator[ResultSet] = resultSetToIterator(resultSet)
     def headOption:Option[ResultSet] =
       if (resultSet.next()) Some(resultSet) else None
   }

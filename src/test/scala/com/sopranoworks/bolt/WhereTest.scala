@@ -36,26 +36,26 @@ class WhereTest extends Specification {
   }
 
   "eval" should {
-    /*"no and" in {
-      val nat = new DummyNat
-      nat.database.asInstanceOf[DummyDatabase].tables += ("TEST_TABLE"->
+    "no and" in {
+      val nut = new DummyNut
+      nut.database.asInstanceOf[DummyDatabase].tables += ("TEST_TABLE"->
         Table(null,"TEST_TABLE",List(),Index("PRIMARY_KEY",List(IndexColumn("ID",0,"INT64",false,"ASC"))),Map.empty[String,Index]))
-      val qc = QueryContext(nat,null)
+      val qc = QueryContext(nut,null)
       qc.setCurrentTable("TEST_TABLE")
       val w = Where(qc,"TEST_TABLE","WHERE ID=0",BooleanExpressionValue("=",TableColumnValue("ID","TEST_TABLE",0),IntValue(0)))
       w.eval()
       w.isOptimizedWhere must_== true
     }
     "one and" in {
-      val nat = new DummyNat
-      nat.database.asInstanceOf[DummyDatabase].tables += ("TEST_TABLE"->
+      val nut = new DummyNut
+      nut.database.asInstanceOf[DummyDatabase].tables += ("TEST_TABLE"->
         Table(null,"TEST_TABLE",List(),Index("PRIMARY_KEY",List(IndexColumn("ID1",0,"INT64",false,"ASC"),IndexColumn("ID2",1,"INT64",false,"ASC"))),Map.empty[String,Index]))
-      val qc = QueryContext(nat,null)
+      val qc = QueryContext(nut,null)
       qc.setCurrentTable("TEST_TABLE")
       val w = Where(qc,"TEST_TABLE","WHERE ID=1 AND ID2=0",BooleanExpressionValue("AND",BooleanExpressionValue("=",TableColumnValue("ID1","TEST_TABLE",0),IntValue(0)),BooleanExpressionValue("=",TableColumnValue("ID2","TEST_TABLE",0),IntValue(0))))
       w.eval()
       w.isOptimizedWhere must_== true
-    } */
+    }
     "lack primary key" in {
       val nat = new DummyNut
       nat.database.asInstanceOf[DummyDatabase].tables += ("TEST_TABLE"->

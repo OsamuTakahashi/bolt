@@ -11,7 +11,7 @@
   */
 package com.sopranoworks.bolt
 
-import com.google.cloud.spanner.Mutation
+import com.google.cloud.spanner.{Key, KeySet, Mutation}
 import com.sopranoworks.bolt.values._
 
 /**
@@ -19,6 +19,7 @@ import com.sopranoworks.bolt.values._
   */
 case class Where(qc:QueryContext,var tableName:String,whereStmt:String,boolExpression:Value) {
   private var _kv:Option[List[KeyValue]] = None
+  private var _tbl:Option[Table] = None
 
   private def _extractAndExpression(v:Value):List[Value] = {
     v() match {
@@ -57,7 +58,10 @@ case class Where(qc:QueryContext,var tableName:String,whereStmt:String,boolExpre
                   }
                 case _ => false
               }
-          }) { _kv = Some(kv.reverse) }
+          }) {
+          _kv = Some(kv.reverse)
+          _tbl = Some(tbl)
+        }
       }
     }
   }
@@ -66,5 +70,20 @@ case class Where(qc:QueryContext,var tableName:String,whereStmt:String,boolExpre
 
   def setPrimaryKeys(m:Mutation.WriteBuilder):Unit = {
     _kv.foreach(_.foreach(kv=>kv.value.setTo(m,kv.key)))
+  }
+
+  def asDeleteMutation:Mutation = {
+      (for {
+        kvs <- _kv
+        tbl <- _tbl
+      } yield {
+        for {
+          pk  <- tbl.primaryKey.columns
+          kv  <- kvs.find(_.key == pk.name)
+        } yield {
+          kv.value.text
+        }
+      }).map(pks => Mutation.delete(tableName,Key.of(pks.toArray)))
+        .getOrElse(throw new RuntimeException(s"Could not create delete-mutation from $whereStmt"))
   }
 }

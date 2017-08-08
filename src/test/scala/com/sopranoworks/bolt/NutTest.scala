@@ -27,9 +27,13 @@ class NutTest extends Specification with BeforeAfterEach {
     val dbClient = spanner.getDatabaseClient(DatabaseId.of(options.getProjectId, config.getString("spanner.instance"), config.getString("spanner.database")))
     Database.startWith(dbClient)
     _dbClient = Some(dbClient)
-    _dbClient.foreach(_.executeQuery("DELETE FROM TEST_TABLE"))
-    _dbClient.foreach(_.executeQuery("DELETE FROM TEST_ITEMS"))
-    _dbClient.foreach(_.executeQuery("DELETE FROM FROM_TABLE"))
+    _dbClient.foreach(_.executeQuery(
+      """
+        |DELETE FROM TEST_TABLE;
+        |DELETE FROM TEST_ITEMS;
+        |DELETE FROM FROM_TABLE;
+        |DELETE FROM MULTI_KEY;
+        |""".stripMargin))
   }
 
   override protected def after: Any = {
@@ -43,71 +47,50 @@ class NutTest extends Specification with BeforeAfterEach {
 
   "INSERT" should {
     "normally success" in {
-      import Bolt._
-
-      _dbClient.get.executeQuery("INSERT INTO TEST_TABLE VALUES(103,'test insert');")
-      val resSet = _dbClient.get.singleUse().executeQuery(Statement.of("SELECT * FROM TEST_TABLE WHERE id=103"))
-
-      var res = false
-      while(resSet.next()) {
-        res = resSet.getString("name") == "test insert"
-      }
-      resSet.close()
-      _dbClient.get.executeQuery("DELETE FROM TEST_TABLE WHERE id=103;")
-
-      res must_== true
+      _dbClient.get.executeQuery(
+        """
+          |INSERT INTO TEST_TABLE VALUES(103,'test insert');
+          |SELECT * FROM TEST_TABLE WHERE id=103;
+          |""".stripMargin)
+        .autoclose(_.headOption.get.getString("name")) must_== "test insert"
     }
     "multiple insert" in {
-      _dbClient.get.executeQuery("INSERT INTO TEST_ITEMS VALUES(0,0,0,100);")
-      _dbClient.get.executeQuery("INSERT INTO TEST_ITEMS VALUES(1,0,1,100);")
-      _dbClient.get.executeQuery("INSERT INTO TEST_ITEMS VALUES(2,0,2,100);")
-      _dbClient.get.executeQuery("INSERT INTO TEST_ITEMS VALUES(3,0,3,100);")
-
-      val resSet2 = _dbClient.get.singleUse().executeQuery(Statement.of("SELECT * FROM TEST_ITEMS"))
-
-      var count = 0
-      while(resSet2.next()) {
-        count += 1
-      }
-      resSet2.close()
-      count must_== 4
+      _dbClient.get.executeQuery(
+        """
+          |INSERT INTO TEST_ITEMS VALUES(0,0,0,100);
+          |INSERT INTO TEST_ITEMS VALUES(1,0,1,100);
+          |INSERT INTO TEST_ITEMS VALUES(2,0,2,100);
+          |INSERT INTO TEST_ITEMS VALUES(3,0,3,100);
+          |SELECT * FROM TEST_ITEMS;
+          |""".stripMargin)
+        .autoclose(_.length) must_== 4
     }
     "multiple insert 2" in {
-      _dbClient.get.executeQuery("INSERT INTO TEST_ITEMS (id,uid,iid,count) VALUES(0,0,0,100);")
-      _dbClient.get.executeQuery("INSERT INTO TEST_ITEMS (id,uid,iid,count) VALUES(1,0,1,100);")
-      _dbClient.get.executeQuery("INSERT INTO TEST_ITEMS (id,uid,iid,count) VALUES(2,0,2,100);")
-      _dbClient.get.executeQuery("INSERT INTO TEST_ITEMS (id,uid,iid,count) VALUES(3,0,3,100);")
-
-      _dbClient.get.executeQuery("INSERT INTO TEST_ITEMS (id,uid,iid,count) VALUES(4,0,4,100)")
-      _dbClient.get.executeQuery("INSERT INTO TEST_ITEMS (id,uid,iid,count) VALUES(5,0,5,100)")
-      _dbClient.get.executeQuery("INSERT INTO TEST_ITEMS (id,uid,iid,count) VALUES(6,0,6,100)")
-      _dbClient.get.executeQuery("INSERT INTO TEST_ITEMS (id,uid,iid,count) VALUES(7,0,7,100)")
-
-      val resSet2 = _dbClient.get.singleUse().executeQuery(Statement.of("SELECT * FROM TEST_ITEMS"))
-
-      var count = 0
-      while(resSet2.next()) {
-        count += 1
-      }
-      resSet2.close()
-      count must_== 8
+      _dbClient.get.executeQuery(
+        """
+          |INSERT INTO TEST_ITEMS (id,uid,iid,count) VALUES(0,0,0,100);
+          |INSERT INTO TEST_ITEMS (id,uid,iid,count) VALUES(1,0,1,100);
+          |INSERT INTO TEST_ITEMS (id,uid,iid,count) VALUES(2,0,2,100);
+          |INSERT INTO TEST_ITEMS (id,uid,iid,count) VALUES(3,0,3,100);
+          |INSERT INTO TEST_ITEMS (id,uid,iid,count) VALUES(4,0,4,100);
+          |INSERT INTO TEST_ITEMS (id,uid,iid,count) VALUES(5,0,5,100);
+          |INSERT INTO TEST_ITEMS (id,uid,iid,count) VALUES(6,0,6,100);
+          |INSERT INTO TEST_ITEMS (id,uid,iid,count) VALUES(7,0,7,100);
+          |SELECT * FROM TEST_ITEMS;
+          |""".stripMargin)
+        .autoclose(_.length) must_== 8
     }
     "insert select" in {
-      _dbClient.get.executeQuery("INSERT INTO TEST_ITEMS (id,uid,iid,count) VALUES(0,0,0,100);")
-      _dbClient.get.executeQuery("INSERT INTO TEST_ITEMS (id,uid,iid,count) VALUES(1,0,1,100);")
-      _dbClient.get.executeQuery("INSERT INTO TEST_ITEMS (id,uid,iid,count) VALUES(2,0,2,100);")
-      _dbClient.get.executeQuery("INSERT INTO TEST_ITEMS (id,uid,iid,count) VALUES(3,0,3,100);")
-
-      _dbClient.get.executeQuery("INSERT INTO TEST_TABLE SELECT id,uid FROM TEST_ITEMS")
-
-      val resSet2 = _dbClient.get.singleUse().executeQuery(Statement.of("SELECT * FROM TEST_TABLE"))
-
-      var count = 0
-      while(resSet2.next()) {
-        count += 1
-      }
-      resSet2.close()
-      count must_== 4
+      _dbClient.get.executeQuery(
+        """
+          |INSERT INTO TEST_ITEMS (id,uid,iid,count) VALUES(0,0,0,100);
+          |INSERT INTO TEST_ITEMS (id,uid,iid,count) VALUES(1,0,1,100);
+          |INSERT INTO TEST_ITEMS (id,uid,iid,count) VALUES(2,0,2,100);
+          |INSERT INTO TEST_ITEMS (id,uid,iid,count) VALUES(3,0,3,100);
+          |INSERT INTO TEST_TABLE SELECT id,uid FROM TEST_ITEMS;
+          |SELECT * FROM TEST_TABLE;
+          |""".stripMargin)
+        .autoclose(_.length) must_== 4
     }
   }
   "UPDATE" should {
@@ -278,6 +261,16 @@ class NutTest extends Specification with BeforeAfterEach {
       }
       resSet2.close()
       count must_== 2
+    }
+    "multiple primary key" in {
+      _dbClient.get.executeQuery(
+        """
+          |INSERT INTO MULTI_KEY VALUES(1,2,3),(2,3,4),(3,4,5);
+          |DELETE FROM MULTI_KEY WHERE id1=2 AND id2=3;
+          |SELECT * FROM MULTI_KEY
+          |""".stripMargin)
+
+      .autoclose (_.length) must_== 2
     }
   }
   "beginTransaction" should {
