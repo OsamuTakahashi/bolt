@@ -76,6 +76,10 @@ dbClient.executeQuery("SELECT * FROM test_tbl01").autoclose(
 )
 ```
 
+#### More examples
+
+See NutTest.scala
+
 
 ### In Java,
 

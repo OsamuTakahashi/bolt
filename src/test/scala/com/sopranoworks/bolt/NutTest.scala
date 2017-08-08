@@ -1,6 +1,5 @@
 package com.sopranoworks.bolt
 
-import com.google.cloud.spanner.TransactionRunner.TransactionCallable
 import com.google.cloud.spanner._
 import com.typesafe.config.ConfigFactory
 import org.specs2.mutable.Specification
@@ -95,172 +94,104 @@ class NutTest extends Specification with BeforeAfterEach {
   }
   "UPDATE" should {
     "normally success" in {
-      _dbClient.get.executeQuery("INSERT INTO TEST_TABLE VALUES(103,'test insert');")
-      val resSet = _dbClient.get.singleUse().executeQuery(Statement.of("SELECT * FROM TEST_TABLE WHERE id=103"))
+      _dbClient.get.executeQuery(
+        """
+          |INSERT INTO TEST_TABLE VALUES(103,'test insert');
+          |SELECT * FROM TEST_TABLE WHERE id=103;
+          |""".stripMargin)
+        .autoclose(_.headOption.get.getString("name")) must_== "test insert"
 
-      var res = false
-      while(resSet.next()) {
-        res = resSet.getString("name") == "test insert"
-      }
-      resSet.close()
-      res must_== true
-
-      _dbClient.get.executeQuery("UPDATE TEST_TABLE SET name='new name' WHERE id=103;")
-
-      val resSet2 = _dbClient.get.singleUse().executeQuery(Statement.of("SELECT * FROM TEST_TABLE WHERE id=103"))
-
-      var res2 = false
-      while(resSet2.next()) {
-        res2 = resSet2.getString("name") == "new name"
-      }
-      resSet2.close()
-
-      _dbClient.get.executeQuery("DELETE FROM TEST_TABLE WHERE id=103;")
-
-      res2 must_== true
+      _dbClient.get.executeQuery(
+        """
+          |UPDATE TEST_TABLE SET name='new name' WHERE id=103;
+          |SELECT * FROM TEST_TABLE WHERE id=103;
+          |""".stripMargin)
+        .autoclose(_.headOption.get.getString("name")) must_== "new name"
     }
     "multiple rows" in {
-      _dbClient.get.executeQuery("INSERT INTO TEST_TABLE VALUES(101,'user1');")
-      _dbClient.get.executeQuery("INSERT INTO TEST_TABLE VALUES(102,'user2');")
-      _dbClient.get.executeQuery("INSERT INTO TEST_TABLE VALUES(103,'user3');")
-
-      _dbClient.get.executeQuery("UPDATE TEST_TABLE SET name='new name' WHERE id>100;")
-
-      val resSet2 = _dbClient.get.singleUse().executeQuery(Statement.of("SELECT * FROM TEST_TABLE"))
-
-      var res2 = false
-      while(resSet2.next()) {
-        res2 = resSet2.getString("name") == "new name"
-      }
-      resSet2.close()
-
-      _dbClient.get.executeQuery("DELETE FROM TEST_TABLE WHERE id>100;")
-
-      res2 must_== true
+      _dbClient.get.executeQuery(
+        """
+          |INSERT INTO TEST_TABLE VALUES(101,'user1');
+          |INSERT INTO TEST_TABLE VALUES(102,'user2');
+          |INSERT INTO TEST_TABLE VALUES(103,'user3');
+          |UPDATE TEST_TABLE SET name='new name' WHERE id>100;
+          |SELECT * FROM TEST_TABLE;
+          |""".stripMargin)
+        .autoclose(_.headOption.get.getString("name")) must_== "new name"
     }
     "multiple rows 2" in {
-      _dbClient.get.executeQuery("INSERT INTO TEST_TABLE VALUES(101,'user1');")
-      _dbClient.get.executeQuery("INSERT INTO TEST_TABLE VALUES(102,'user2');")
-      _dbClient.get.executeQuery("INSERT INTO TEST_TABLE VALUES(103,'user3');")
-
-      _dbClient.get.executeQuery("UPDATE TEST_TABLE SET name='new name' WHERE id=101 OR id=103;")
-
-      val resSet2 = _dbClient.get.singleUse().executeQuery(Statement.of("SELECT * FROM TEST_TABLE"))
-
-      var count = 0
-      while(resSet2.next()) {
-        if (resSet2.getString("name") == "new name")
-          count += 1
-      }
-      resSet2.close()
-
-      _dbClient.get.executeQuery("DELETE FROM TEST_TABLE WHERE id>100;")
-
-      count must_== 2
+      _dbClient.get.executeQuery(
+        """
+          |INSERT INTO TEST_TABLE VALUES(101,'user1');
+          |INSERT INTO TEST_TABLE VALUES(102,'user2');
+          |INSERT INTO TEST_TABLE VALUES(103,'user3');
+          |UPDATE TEST_TABLE SET name='new name' WHERE id=101 OR id=103;
+          |SELECT * FROM TEST_TABLE;
+          |""".stripMargin)
+        .autoclose(_.count(_.getString("name") == "new name")) must_== 2
     }
     "not primary key" in {
-      _dbClient.get.executeQuery("INSERT INTO TEST_TABLE VALUES(101,'user1');")
-      _dbClient.get.executeQuery("INSERT INTO TEST_TABLE VALUES(102,'user2');")
-      _dbClient.get.executeQuery("INSERT INTO TEST_TABLE VALUES(103,'user3');")
-
-      _dbClient.get.executeQuery("UPDATE TEST_TABLE SET name='new name' WHERE name='user1';")
-
-      val resSet2 = _dbClient.get.singleUse().executeQuery(Statement.of("SELECT * FROM TEST_TABLE"))
-
-      var count = 0
-      while(resSet2.next()) {
-        if (resSet2.getString("name") == "new name")
-          count += 1
-      }
-      resSet2.close()
-
-      _dbClient.get.executeQuery("DELETE FROM TEST_TABLE WHERE id>100;")
-
-      count must_== 1
+      _dbClient.get.executeQuery(
+        """
+          |INSERT INTO TEST_TABLE VALUES(101,'user1');
+          |INSERT INTO TEST_TABLE VALUES(102,'user2');
+          |INSERT INTO TEST_TABLE VALUES(103,'user3');
+          |UPDATE TEST_TABLE SET name='new name' WHERE name='user1';
+          |SELECT * FROM TEST_TABLE;
+          |""".stripMargin)
+        .autoclose(_.count(_.getString("name") == "new name")) must_== 1
     }
     "not primary key multi row" in {
-      _dbClient.get.executeQuery("INSERT INTO TEST_TABLE VALUES(101,'user1');")
-      _dbClient.get.executeQuery("INSERT INTO TEST_TABLE VALUES(102,'user2');")
-      _dbClient.get.executeQuery("INSERT INTO TEST_TABLE VALUES(103,'user3');")
-
-      _dbClient.get.executeQuery("UPDATE TEST_TABLE SET name='new name' WHERE name='user1' OR name='user2';")
-
-      val resSet2 = _dbClient.get.singleUse().executeQuery(Statement.of("SELECT * FROM TEST_TABLE"))
-
-      var count = 0
-      while(resSet2.next()) {
-        if (resSet2.getString("name") == "new name")
-          count += 1
-      }
-      resSet2.close()
-
-      _dbClient.get.executeQuery("DELETE FROM TEST_TABLE WHERE id>100;")
-
-      count must_== 2
+      _dbClient.get.executeQuery(
+        """
+          |INSERT INTO TEST_TABLE VALUES(101,'user1');
+          |INSERT INTO TEST_TABLE VALUES(102,'user2');
+          |INSERT INTO TEST_TABLE VALUES(103,'user3');
+          |UPDATE TEST_TABLE SET name='new name' WHERE name='user1' OR name='user2';
+          |SELECT * FROM TEST_TABLE;
+          |""".stripMargin)
+        .autoclose(_.count(_.getString("name") == "new name")) must_== 2
     }
     "update select" in {
-      _dbClient.get.executeQuery("INSERT INTO TEST_TABLE VALUES(101,'user1');")
-      _dbClient.get.executeQuery("INSERT INTO TEST_TABLE VALUES(102,'user2');")
-      _dbClient.get.executeQuery("INSERT INTO TEST_TABLE VALUES(103,'user3');")
-
-      _dbClient.get.executeQuery("INSERT INTO FROM_TABLE VALUES(101,1,'from');")
-
-      _dbClient.get.executeQuery("UPDATE TEST_TABLE SET (name) = (SELECT description FROM FROM_TABLE) WHERE id=101;")
-
-      val resSet = _dbClient.get.executeQuery("SELECT name from TEST_TABLE where id=101;")
-      resSet.autoclose {
-        res =>
-          res.next()
-          res.getString(0) must_== "from"
-      }
+      _dbClient.get.executeQuery(
+        """
+          |INSERT INTO TEST_TABLE VALUES(101,'user1');
+          |INSERT INTO TEST_TABLE VALUES(102,'user2');
+          |INSERT INTO TEST_TABLE VALUES(103,'user3');
+          |INSERT INTO FROM_TABLE VALUES(101,1,'from');
+          |UPDATE TEST_TABLE SET (name) = (SELECT description FROM FROM_TABLE) WHERE id=101;
+          |SELECT name from TEST_TABLE where id=101;
+          |""".stripMargin)
+        .autoclose(_.headOption.get.getString(0)) must_== "from"
     }
     "update with self column" in {
-      val sql =
-        """
+      _dbClient.get.executeQuery("""
           |INSERT INTO TEST_ITEMS VALUES(0,0,0,1);
           |UPDATE TEST_ITEMS SET count = count + 1 WHERE id=0;
           |SELECT * from TEST_ITEMS WHERE id=0;
-        """.stripMargin
-
-      val resSet = _dbClient.get.executeQuery(sql)
-      resSet.autoclose {
-        res =>
-          res.next()
-          res.getLong("count") must_== 2
-      }
+        """.stripMargin)
+        .autoclose(_.headOption.get.getLong("count")) must_== 2
     }
     "update with self column 2" in {
-      val sql =
-        """
+      _dbClient.get.executeQuery("""
           |INSERT INTO TEST_ITEMS VALUES(0,0,0,1);
           |UPDATE TEST_ITEMS SET count = count + count + 1 WHERE id=0;
           |SELECT * from TEST_ITEMS WHERE id=0;
-        """.stripMargin
-
-      val resSet = _dbClient.get.executeQuery(sql)
-      resSet.autoclose {
-        res =>
-          res.next()
-          res.getLong("count") must_== 3
-      }
+        """.stripMargin)
+        .autoclose(_.headOption.get.getLong("count")) must_== 3
     }
   }
   "DELETE" should {
     "multiple rows" in {
-      _dbClient.get.executeQuery("INSERT INTO TEST_TABLE VALUES(101,'user1');")
-      _dbClient.get.executeQuery("INSERT INTO TEST_TABLE VALUES(102,'user2');")
-      _dbClient.get.executeQuery("INSERT INTO TEST_TABLE VALUES(103,'user3');")
-
-      _dbClient.get.executeQuery("DELETE FROM TEST_TABLE WHERE id=101 OR id=104;")
-
-      val resSet2 = _dbClient.get.executeQuery("SELECT * FROM TEST_TABLE")
-
-      var count = 0
-      while(resSet2.next()) {
-        count += 1
-      }
-      resSet2.close()
-      count must_== 2
+      _dbClient.get.executeQuery(
+        """
+          |INSERT INTO TEST_TABLE VALUES(101,'user1');
+          |INSERT INTO TEST_TABLE VALUES(102,'user2');
+          |INSERT INTO TEST_TABLE VALUES(103,'user3');
+          |DELETE FROM TEST_TABLE WHERE id=101 OR id=104;
+          |SELECT * FROM TEST_TABLE;
+          |""".stripMargin)
+        .autoclose(_.length) must_== 2
     }
     "multiple primary key" in {
       _dbClient.get.executeQuery(
@@ -275,9 +206,12 @@ class NutTest extends Specification with BeforeAfterEach {
   }
   "beginTransaction" should {
     "normally success" in {
-      _dbClient.get.executeQuery("INSERT INTO TEST_TABLE VALUES(101,'user1');")
-      _dbClient.get.executeQuery("INSERT INTO TEST_TABLE VALUES(102,'user2');")
-      _dbClient.get.executeQuery("INSERT INTO TEST_TABLE VALUES(103,'user3');")
+      _dbClient.get.executeQuery(
+        """
+          |INSERT INTO TEST_TABLE VALUES(101,'user1');
+          |INSERT INTO TEST_TABLE VALUES(102,'user2');
+          |INSERT INTO TEST_TABLE VALUES(103,'user3');
+          |""".stripMargin)
 
       var count0 = 0
       _dbClient.get.beginTransaction {
@@ -294,36 +228,20 @@ class NutTest extends Specification with BeforeAfterEach {
           }
       }
       count0 must_== 3
-
-
-      val resSet2 = _dbClient.get.executeQuery("SELECT * FROM TEST_TABLE WHERE name='new name';")
-
-      var count = 0
-//      try {
-//        resSet2.map(_ => count += 1)
-////        for {
-////          r <- resSet2.iterator
-////        } yield {
-////          println("*")
-////          count += 1
-////        }
-//      } catch {
-//        case e:SpannerException =>
-//          println(e.getMessage)
-//      }
-      while(resSet2.next()) {
-        count += 1
-      }
-      resSet2.close()
-      count must_== 3
+      
+      _dbClient.get.executeQuery("SELECT * FROM TEST_TABLE WHERE name='new name';")
+        .autoclose(_.length) must_== 3
     }
     "multiple commit" in {
       _dbClient.get.beginTransaction {
         db =>
-          db.executeQuery("INSERT INTO TEST_ITEMS (id,uid,iid,count) VALUES(0,0,0,100);")
-          db.executeQuery("INSERT INTO TEST_ITEMS (id,uid,iid,count) VALUES(1,0,1,100);")
-          db.executeQuery("INSERT INTO TEST_ITEMS (id,uid,iid,count) VALUES(2,0,2,100);")
-          db.executeQuery("INSERT INTO TEST_ITEMS (id,uid,iid,count) VALUES(3,0,3,100);")
+          db.executeQuery(
+            """
+              |INSERT INTO TEST_ITEMS (id,uid,iid,count) VALUES(0,0,0,100);
+              |INSERT INTO TEST_ITEMS (id,uid,iid,count) VALUES(1,0,1,100);
+              |INSERT INTO TEST_ITEMS (id,uid,iid,count) VALUES(2,0,2,100);
+              |INSERT INTO TEST_ITEMS (id,uid,iid,count) VALUES(3,0,3,100);
+              |""".stripMargin)
       }
 
       _dbClient.get.beginTransaction {
@@ -332,18 +250,16 @@ class NutTest extends Specification with BeforeAfterEach {
           while(resSet.next()) {}
           resSet.close()
 
-          db.executeQuery("INSERT INTO TEST_ITEMS (id,uid,iid,count) VALUES(4,0,4,100)")
-          db.executeQuery("INSERT INTO TEST_ITEMS (id,uid,iid,count) VALUES(5,0,5,100)")
-          db.executeQuery("INSERT INTO TEST_ITEMS (id,uid,iid,count) VALUES(6,0,6,100)")
-          db.executeQuery("INSERT INTO TEST_ITEMS (id,uid,iid,count) VALUES(7,0,7,100)")
+          db.executeQuery(
+            """
+              |INSERT INTO TEST_ITEMS (id,uid,iid,count) VALUES(4,0,4,100);
+              |INSERT INTO TEST_ITEMS (id,uid,iid,count) VALUES(5,0,5,100);
+              |INSERT INTO TEST_ITEMS (id,uid,iid,count) VALUES(6,0,6,100);
+              |INSERT INTO TEST_ITEMS (id,uid,iid,count) VALUES(7,0,7,100);
+              |""".stripMargin)
       }
-      val resSet2 = _dbClient.get.executeQuery("SELECT * FROM TEST_ITEMS;")
-      var count = 0
-      while(resSet2.next()) {
-        count += 1
-      }
-      resSet2.close()
-      count must_== 8
+      _dbClient.get.executeQuery("SELECT * FROM TEST_ITEMS;")
+        .autoclose(_.length) must_== 8
     }
     "multiple commit 2" in {
       val table = "TEST_ITEMS"
@@ -370,13 +286,8 @@ class NutTest extends Specification with BeforeAfterEach {
             }
         }
       }
-      val resSet2 = _dbClient.get.executeQuery(s"SELECT * FROM $table;")
-      var count = 0
-      while(resSet2.next()) {
-        count += 1
-      }
-      resSet2.close()
-      count must_== 8
+      _dbClient.get.executeQuery(s"SELECT * FROM $table;")
+        .autoclose(_.length) must_== 8
     }
   }
   "tableExists" should {
