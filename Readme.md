@@ -90,18 +90,18 @@ nut.executeQuery("INSERT INTO TEST_TABLE (ID,NAME) VALUES(101,'test');");
 
 This project also contains console spanner client application, spanne-cli.
 
-dist/spanner-cli-0.14.zip
+dist/spanner-cli-0.15-SNAPSHOT.zip
 
-MD5:c27ac438bdec370cbe78b3f148f71bb3
+MD5:c1005e19f6456d6af1c659295b86ac0b
 
 ### spanner-dump
 
 This is a bonus program.
 It will dump a spanner database to sql text code.
 
-dist/spanner-dump-0.14.zip
+dist/spanner-dump-0.15-SNAPSHOT.zip
 
-MD5:42c488cee2c40d77c46caa4042826433
+MD5:7a6f628d6f4ddf34ac51f5c6f9534662
 
 ## Notice
 
