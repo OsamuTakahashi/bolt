@@ -202,8 +202,8 @@ case class FunctionValue(name:String,parameters:java.util.List[Value]) extends W
       case "NOW" =>
         if (parameters.nonEmpty)
           throw new RuntimeException("Function NOW takes no parameter")
-          val ts = Timestamp.now()
-          Some(TimestampValue(ts.toString))
+        val ts = Timestamp.now()
+        Some(TimestampValue(ts.toString))
 
       case "COALESCE" =>
         if (parameters.isEmpty)

@@ -93,7 +93,7 @@ object Bolt {
       val m = Mutation.newInsertBuilder(tableName)
       _tableColumns(tableName).zip(values).foreach {
         case (k,v) =>
-          v.setTo(m,k.name)
+          v.eval.asValue.setTo(m,k.name)
       }
       _transactionContext match {
         case Some(_) =>
@@ -107,7 +107,7 @@ object Bolt {
       val m = Mutation.newInsertBuilder(tableName)
       columns.zip(values).foreach {
         case (k,v) =>
-          v.setTo(m,k)
+          v.eval.asValue.setTo(m,k)
       }
       _transactionContext match {
         case Some(_) =>
@@ -123,7 +123,7 @@ object Bolt {
           val m = Mutation.newInsertBuilder(tableName)
           columns.zip(v).foreach {
             case (k,vv) =>
-              vv.setTo(m,k)
+              vv.eval.asValue.setTo(m,k)
           }
           m.build()
       }
@@ -144,7 +144,7 @@ object Bolt {
           val m = Mutation.newInsertBuilder(tableName)
           columns.zip(v).foreach {
             case (k,vv) =>
-              vv.setTo(m,k.name)
+              vv.eval.asValue.setTo(m,k.name)
           }
           m.build()
       }
@@ -168,7 +168,7 @@ object Bolt {
           val m = Mutation.newInsertBuilder(tableName)
           columns.foreach {
             col =>
-              reader.getColumn(st,col.position).setTo(m,col.name)
+              reader.getColumn(st,col.position).asValue.setTo(m,col.name)
           }
           m.build()
       })

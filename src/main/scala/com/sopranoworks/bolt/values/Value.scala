@@ -40,7 +40,7 @@ trait Value {
   def asArray:ArrayValue = throw new RuntimeException("Could not treat the value as Array")
 
   def setTo(m:Mutation.WriteBuilder,key:String):Unit = {
-    throw new RuntimeException("The value is not storable")
+    throw new RuntimeException(s"The value is not storable:'${text}'")
   }
 
   def isEqualValue(v:Value):Boolean = false

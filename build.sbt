@@ -115,7 +115,8 @@ lazy val client = (project in file("client"))
         val oldStrategy = (assemblyMergeStrategy in assembly).value
         oldStrategy(x)
     },
-    libraryDependencies ++= scoptLibrary ++ jlineLibrary
+    libraryDependencies ++= scoptLibrary ++ jlineLibrary,
+    dependencyOverrides += "io.netty" % "netty-tcnative-boringssl-static" % "1.1.33.Fork22"  // for SIGILL hack on old intel CPUs
   ).dependsOn(core)
   .settings(noJavaDoc: _*)
 
@@ -147,6 +148,7 @@ lazy val dump = (project in file("dump"))
         val oldStrategy = (assemblyMergeStrategy in assembly).value
         oldStrategy(x)
     },
-    libraryDependencies ++= scoptLibrary ++ jlineLibrary
+    libraryDependencies ++= scoptLibrary ++ jlineLibrary,
+    dependencyOverrides += "io.netty" % "netty-tcnative-boringssl-static" % "1.1.33.Fork22"  // for SIGILL hack on old intel CPUs
   ).dependsOn(core)
   .settings(noJavaDoc: _*)
