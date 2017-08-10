@@ -11,9 +11,7 @@
   */
 package com.sopranoworks.bolt.values
 
-import com.google.cloud.{Date, Timestamp}
 import com.google.cloud.spanner.{Mutation, Type}
-import org.joda.time.DateTime
 
 /**
   * Created by takahashi on 2017/03/29.
@@ -160,66 +158,6 @@ case class DoubleValue(text:String,var value:Double = 0,var evaluated:Boolean = 
 
 object DoubleValue {
   def apply(v:Double):DoubleValue = new DoubleValue(v)
-}
-
-case class TimestampValue(text:String,private var _timestamp: Timestamp = null) extends Value with TextSetter with LiteralValue {
-  override def qtext:String = s"'$text'"
-  override def spannerType: Type = Type.timestamp()
-  override def isEqualValue(v:Value):Boolean =
-    v.isInstanceOf[TimestampValue] && v.asInstanceOf[TimestampValue].text == text
-
-  override def eval: Value = {
-    if (_timestamp == null) {
-      _timestamp = Timestamp.parseTimestamp(text)
-    }
-    this
-  }
-  def timestamp = _timestamp
-}
-
-case class DateValue(textDate:String,private var dateTime:DateTime = null) extends Value with TextSetter with LiteralValue {
-  override def text: String = {
-    if (textDate == null) {
-      Date.fromYearMonthDay(dateTime.getYear,dateTime.getMonthOfYear,dateTime.getDayOfMonth).toString
-    } else textDate
-  }
-  
-  override def qtext:String = s"DATE '$text'"
-  override def spannerType: Type = Type.date()
-  override def isEqualValue(v:Value):Boolean =
-    v.isInstanceOf[DateValue] && v.asInstanceOf[DateValue].text == text
-
-  override def eval: Value = {
-    if (dateTime == null) {
-      val d = Date.parseDate(text)
-      dateTime = new DateTime().withDate(d.getYear, d.getMonth, d.getDayOfMonth)
-    }
-    this
-  }
-
-  override def getField(fieldName: String): Value = {
-    fieldName match {
-      case "DAYOFWEEK" =>
-        IntValue((date.getDayOfWeek + 1) % 8)
-      case "DAY" =>
-        IntValue(date.getDayOfMonth)
-      case "DAYOFYEAR" =>
-        IntValue(date.getDayOfYear)
-      case "MONTH" =>
-        IntValue(date.getMonthOfYear)
-      case "QUARTER" =>
-        IntValue((date.getMonthOfYear - 1) / 3 + 1)
-      case "YEAR" =>
-        IntValue(date.getYear)
-      case _ =>
-        throw new RuntimeException(s"The value '$text' does not have a field #$fieldName.")
-    }
-  }
-
-  def date:DateTime = {
-    this.eval
-    dateTime
-  }
 }
 
 case class BytesValue(text:String) extends Value with LiteralValue {

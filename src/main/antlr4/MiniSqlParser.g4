@@ -499,7 +499,7 @@ bool_value  returns [ Value v = null ]
 
 datetime_value  returns [ Value v = null ]
         : DATE STRING { $v = new DateValue($STRING.text.substring(1,$STRING.text.length() - 1),null); }
-        | TIMESTAMP STRING { $v = new TimestampValue($STRING.text.substring(1,$STRING.text.length() - 1),null); }
+        | TIMESTAMP STRING { $v = new TimestampValue($STRING.text.substring(1,$STRING.text.length() - 1),null,0); }
         | INTERVAL INT_VAL ID { $v = new IntervalValue(Integer.parseInt($INT_VAL.text),$ID.text); }
         ;
 

@@ -55,7 +55,9 @@ case class FunctionValue(name:String,parameters:java.util.List[Value]) extends W
               parameters.get(0).eval.asValue match {
                 case t: TimestampValue =>
                   val zone = DateTimeZone.forID("America/Los_Angeles")
-                  DateValue(null, new DateTime(new java.util.Date(t.timestamp.getSeconds * 1000 + t.timestamp.getNanos / 1000)).withZone(zone))
+//                  DateValue(null, new DateTime(new java.util.Date(t.timestamp.getSeconds * 1000 + t.timestamp.getNanos / 1000)).withZone(zone))
+//                  DateValue(null, new DateTime().withZone(zone).withMillis(t.timestamp.getSeconds * 1000 + t.timestamp.getNanos / 1000))
+                    DateValue(null, new DateTime().withZone(zone).withMillis(t.timestamp._1.getMillis))
                 case _ =>
                   throw new RuntimeException("Unmatched parameter types for function DATE")
               }
@@ -65,7 +67,9 @@ case class FunctionValue(name:String,parameters:java.util.List[Value]) extends W
               (parameters.get(0).eval.asValue, parameters.get(1).eval.asValue) match {
                 case (t: TimestampValue, z: StringValue) =>
                   val zone = DateTimeZone.forID(z.text)
-                  DateValue(null, new DateTime(new java.util.Date(t.timestamp.getSeconds * 1000 + t.timestamp.getNanos / 1000)).withZone(zone))
+//                  DateValue(null, new DateTime(new java.util.Date(t.timestamp.getSeconds * 1000 + t.timestamp.getNanos / 1000)).withZone(zone))
+//                  DateValue(null, new DateTime().withZone(zone).withMillis(t.timestamp.getSeconds * 1000 + t.timestamp.getNanos / 1000))
+                  DateValue(null, new DateTime().withZone(zone).withMillis(t.timestamp._1.getMillis))
                 case _ =>
                   throw new RuntimeException("Unmatched parameter types for function DATE")
               }
@@ -83,15 +87,15 @@ case class FunctionValue(name:String,parameters:java.util.List[Value]) extends W
             case (dv: DateValue, iv: IntervalValue) =>
               val nd = iv match {
                 case IntervalValue(d, "DAY") =>
-                  dv.date.plusDays(d)
+                  dv.datetime.plusDays(d)
                 case IntervalValue(d, "WEEK") =>
-                  dv.date.plusWeeks(d)
+                  dv.datetime.plusWeeks(d)
                 case IntervalValue(d, "MONTH") =>
-                  dv.date.plusMonths(d)
+                  dv.datetime.plusMonths(d)
                 case IntervalValue(d, "QUARTER") =>
-                  dv.date.plusMonths(d * 3)
+                  dv.datetime.plusMonths(d * 3)
                 case IntervalValue(d, "YEAR") =>
-                  dv.date.plusYears(d)
+                  dv.datetime.plusYears(d)
                 case _ =>
                   throw new RuntimeException(s"Unrecognized date part signature ${iv.unit}")
               }
@@ -111,15 +115,15 @@ case class FunctionValue(name:String,parameters:java.util.List[Value]) extends W
             case (dv: DateValue, iv: IntervalValue) =>
               val nd = iv match {
                 case IntervalValue(d, "DAY") =>
-                  dv.date.minusDays(d)
+                  dv.datetime.minusDays(d)
                 case IntervalValue(d, "WEEK") =>
-                  dv.date.minusWeeks(d)
+                  dv.datetime.minusWeeks(d)
                 case IntervalValue(d, "MONTH") =>
-                  dv.date.minusMonths(d)
+                  dv.datetime.minusMonths(d)
                 case IntervalValue(d, "QUARTER") =>
-                  dv.date.minusMonths(d * 3)
+                  dv.datetime.minusMonths(d * 3)
                 case IntervalValue(d, "YEAR") =>
-                  dv.date.minusYears(d)
+                  dv.datetime.minusYears(d)
                 case _ =>
                   throw new RuntimeException(s"Unrecognized date part signature ${iv.unit}")
               }
@@ -137,23 +141,23 @@ case class FunctionValue(name:String,parameters:java.util.List[Value]) extends W
         _checkStayUnresolved {
           (parameters.get(0).eval.asValue.castTo(Type.date()), parameters.get(1).eval.asValue.castTo(Type.date()), parameters.get(2)) match {
             case (a: DateValue, b: DateValue, IdentifierValue("DAY", _)) =>
-              val d = new Duration(b.date, a.date)
+              val d = new Duration(b.datetime, a.datetime)
               IntValue(d.getStandardDays)
 
             case (a: DateValue, b: DateValue, IdentifierValue("WEEK", _)) =>
-              val d = Weeks.weeksBetween(b.date, a.date)
+              val d = Weeks.weeksBetween(b.datetime, a.datetime)
               IntValue(d.getWeeks)
 
             case (a: DateValue, b: DateValue, IdentifierValue("MONTH", _)) =>
-              val d = Months.monthsBetween(b.date, a.date)
+              val d = Months.monthsBetween(b.datetime, a.datetime)
               IntValue(d.getMonths)
 
             case (a: DateValue, b: DateValue, IdentifierValue("QUATER", _)) =>
-              val d = Months.monthsBetween(b.date, a.date)
+              val d = Months.monthsBetween(b.datetime, a.datetime)
               IntValue(d.getMonths / 3)
 
             case (a: DateValue, b: DateValue, IdentifierValue("YEAR", _)) =>
-              val d = Years.yearsBetween(b.date, a.date)
+              val d = Years.yearsBetween(b.datetime, a.datetime)
               IntValue(d.getYears)
 
             case (a: DateValue, b: DateValue, IdentifierValue(f, _)) =>
@@ -175,17 +179,17 @@ case class FunctionValue(name:String,parameters:java.util.List[Value]) extends W
               d
 
             case (d: DateValue, IdentifierValue("WEEK", _)) =>
-              DateValue(null, d.date.minusDays((d.date.getDayOfWeek + 1) % 8 - 1))
+              DateValue(null, d.datetime.minusDays((d.datetime.getDayOfWeek + 1) % 8 - 1))
 
             case (d: DateValue, IdentifierValue("MONTH", _)) =>
-              DateValue(null, d.date.minusDays(d.date.getDayOfMonth - 1))
+              DateValue(null, d.datetime.minusDays(d.datetime.getDayOfMonth - 1))
 
             case (d: DateValue, IdentifierValue("QUATER", _)) =>
-              val m = d.date.getMonthOfYear
-              DateValue(null, new DateTime(d.date.getYear, d.date.getMonthOfYear - ((m - 1) % 3), 1))
+              val m = d.datetime.getMonthOfYear
+              DateValue(null, new DateTime(d.datetime.getYear, d.datetime.getMonthOfYear - ((m - 1) % 3), 1))
 
             case (d: DateValue, IdentifierValue("YEAR", _)) =>
-              DateValue(null, new DateTime(d.date.getYear, 1, 1))
+              DateValue(null, new DateTime(d.datetime.getYear, 1, 1))
 
             case (_: DateValue, IdentifierValue(f, _)) =>
               throw new RuntimeException(s"Unrecognized date part signature $f")

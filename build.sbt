@@ -6,6 +6,8 @@ val scalaVersions = Seq("2.11.8", "2.12.2")
 
 resolvers in Global += "scalaz-bintray" at "http://dl.bintray.com/scalaz/releases"
 
+val scalaLibrary = Seq("org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.6")
+
 val codebookLibrary = Seq("com.rusty-raven" %% "codebook-runtime" % "1.3.3" excludeAll(
   ExclusionRule(organization = "com.typesafe.akka"),
   ExclusionRule(organization = "net.liftweb")
@@ -60,6 +62,7 @@ lazy val core = (project in file("."))
     version := projectVersion,
     antlr4PackageName in Antlr4 := Some("com.sopranoworks.bolt"),
     libraryDependencies ++=
+      scalaLibrary ++
       spannerClientLibraries ++
       codebookLibrary ++
       loggingLibraries ++
