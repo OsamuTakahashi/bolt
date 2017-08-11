@@ -38,7 +38,7 @@ class FunctionValueTest extends Specification {
 
   "eval" should {
     "$LIKE" in {
-      val v = FunctionValue("$LIKE",List(StringValue("testtest"),StringValue("test%"))).eval.asValue
+      val v = FunctionValueImpl("$LIKE",List(StringValue("testtest"),StringValue("test%"))).eval.asValue
       v.isInstanceOf[BooleanValue] must_== true
       v.asInstanceOf[BooleanValue].f must_== true       
     }
@@ -49,7 +49,7 @@ class FunctionValueTest extends Specification {
       vlist.add(IntValue("3",3,true))
 
       val arr = ArrayValue(vlist,false,Type.int64())
-      val v = FunctionValue("$IN",List(IntValue(3),arr)).eval.asValue
+      val v = FunctionValueImpl("$IN",List(IntValue(3),arr)).eval.asValue
       v.isInstanceOf[BooleanValue] must_== true
       v.asInstanceOf[BooleanValue].f must_== true
     }
@@ -60,12 +60,12 @@ class FunctionValueTest extends Specification {
       vlist.add(IntValue("3",3,true))
 
       val arr = ArrayValue(vlist,false,Type.int64())
-      val v = FunctionValue("$IN",List(IntValue(4),arr)).eval.asValue
+      val v = FunctionValueImpl("$IN",List(IntValue(4),arr)).eval.asValue
       v.isInstanceOf[BooleanValue] must_== true
       v.asInstanceOf[BooleanValue].f must_== false
     }
     "$BETWEEN" in {
-      val v = FunctionValue("$BETWEEN",List(ExpressionValue("+",IntValue(1),IntValue(1)),IntValue(1),IntValue(3))).eval.asValue
+      val v = FunctionValueImpl("$BETWEEN",List(ExpressionValue("+",IntValue(1),IntValue(1)),IntValue(1),IntValue(3))).eval.asValue
       v.isInstanceOf[BooleanValue] must_== true
       v.asInstanceOf[BooleanValue].f must_== true
     }

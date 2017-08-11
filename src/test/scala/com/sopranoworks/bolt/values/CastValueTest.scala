@@ -50,7 +50,7 @@ class CastValueTest extends Specification {
       ex.asValue.asInstanceOf[IntValue].value must_== 100
     }
     "from datetime" in {
-      val ex = CastValue(FunctionValue("NOW",new util.ArrayList[Value]()),Type.int64())
+      val ex = CastValue(FunctionValueImpl("NOW",new util.ArrayList[Value]()),Type.int64())
       ex.eval must throwA[RuntimeException]
     }
   }

@@ -184,7 +184,7 @@ array_path returns [ Value v = null ]
                 List<Value> p = new ArrayList<Value>();
                 p.add($arr);
                 p.add($expression.v);
-                $v = new FunctionValue("\$OFFSET",p);
+                $v = new FunctionValueImpl("\$OFFSET",p);
               }
             }
             | ORDINAL '(' expression ')' {
@@ -194,7 +194,7 @@ array_path returns [ Value v = null ]
                 List<Value> p = new ArrayList<Value>();
                 p.add($arr);
                 p.add($expression.v);
-                $v = new FunctionValue("\$ORDINAL",p);
+                $v = new FunctionValueImpl("\$ORDINAL",p);
               }
             }) ']'
         ;
@@ -212,13 +212,13 @@ bool_expression returns [ Value v = null ]
             params.add($a3.v);
             params.add($b3.v);
             params.add($c3.v);
-            $v = new FunctionValue("\$BETWEEN",params);
+            $v = new FunctionValueImpl("\$BETWEEN",params);
           }
         | a4=bit_or_expr nt1=NOT? LIKE b4=bit_or_expr {
             List<Value> params = new ArrayList<Value>();
             params.add($a4.v);
             params.add($b4.v);
-            $v = new FunctionValue("\$LIKE",params);
+            $v = new FunctionValueImpl("\$LIKE",params);
             if ($nt1 != null) {
               $v = new BooleanExpressionValue("!",$v,null);
             }
@@ -227,7 +227,7 @@ bool_expression returns [ Value v = null ]
             ( array_expression { $params.add($array_expression.v); }
                 | '(' query_expr { $params.add($query_expr.v); } ')'
                 | UNNEST '(' array_expression ')' { $params.add($array_expression.v); } ) {
-            $v = new FunctionValue("\$IN",$params);
+            $v = new FunctionValueImpl("\$IN",$params);
             if ($nt2 != null) {
               $v = new BooleanExpressionValue("!",$v,null);
             }
@@ -235,7 +235,7 @@ bool_expression returns [ Value v = null ]
         | EXISTS '(' query_expr ')' {
             List<Value> params = new ArrayList<Value>();
             params.add($query_expr.v);
-            $v = new FunctionValue("\$EXISTS",params);
+            $v = new FunctionValueImpl("\$EXISTS",params);
           }
         | bool_value { $v = $bool_value.v; }
         | function { $v = $function.v; }
@@ -254,7 +254,7 @@ array_expression
             List<Value> p = new ArrayList<Value>();
             p.add(new SubqueryValue(nut,$query_expr.text,$query_expr.q,$query_expr.columns));
 //            $query_expr.q.setSubquery($v);
-            $v = new FunctionValue("\$ARRAY",p);
+            $v = new FunctionValueImpl("\$ARRAY",p);
           }
         | ID { $v = new IdentifierValue($ID.text,qc); }
         | field_path { $v = $field_path.v; }
@@ -516,7 +516,7 @@ struct_value returns [ StructValue v = null; ]
 function returns [ Value v = null ]
         locals [ List<Value> vlist = new ArrayList<Value>(), String name = null ]
         : (ID { $name = $ID.text; }| IF { $name="IF"; }| DATE { $name="DATE"; }) '(' (MUL | expression { $vlist.add($expression.v); } (',' expression { $vlist.add($expression.v); })* )? ')' {
-            $v = new FunctionValue($name.toUpperCase(),$vlist);
+            $v = new FunctionValueImpl($name.toUpperCase(),$vlist);
           }
         | EXTRACT '(' ID FROM expression ')' {
             $v = new ResultFieldValue($expression.v,$ID.text);
