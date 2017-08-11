@@ -9,6 +9,7 @@ import com.google.cloud.Timestamp;
 import org.joda.time.DateTime;
 import org.joda.time.format.DateTimeFormat;
 import com.sopranoworks.bolt.values.*;
+import com.sopranoworks.bolt.statements.*;
 }
 
 @members {
@@ -336,12 +337,15 @@ update_stmt
         : UPDATE { qc = new QueryContext(nut,qc); } table_name { currentTable = $table_name.text;qc.setCurrentTable($table_name.text); } (AS? alias { qc.addAlias(new TableAlias($alias.text,$table_name.text)); })?
             SET ID EQ expression { $kvs.add(new KeyValue($ID.text,$expression.v)); } ( ',' ID EQ expression { $kvs.add(new KeyValue($ID.text,$expression.v)); } )*
             where_stmt ( LIMIT ln=INT_VAL )? {
-              nut.update(currentTable,$kvs,$where_stmt.where);
+//              nut.update(currentTable,$kvs,$where_stmt.where);
+              nut.execute(new SimpleUpdate(nut,qc,currentTable,$kvs,$where_stmt.where));
               qc = qc.parent();
             }
         | UPDATE { qc = new QueryContext(nut,qc); } table_name { currentTable = $table_name.text; } (AS? alias { qc.addAlias(new TableAlias($alias.text,$table_name.text)); })?
             SET '(' ID { $columns.add($ID.text); } (',' ID { $columns.add($ID.text); })* ')' EQ '(' query_expr ')' where_stmt ( LIMIT ln=INT_VAL )? {
-              nut.update(currentTable, $columns, $query_expr.v, $where_stmt.where);
+//              nut.update(currentTable, $columns, $query_expr.v, $where_stmt.where);
+              nut.execute(new UpdateSelect(nut,qc,currentTable, $columns, $query_expr.v, $where_stmt.where));
+              qc = qc.parent();
             }
         ;
 

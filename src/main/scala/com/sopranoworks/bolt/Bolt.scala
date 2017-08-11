@@ -16,6 +16,7 @@ import com.sopranoworks.bolt.values._
 import com.google.cloud.Date
 import com.google.cloud.spanner.TransactionRunner.TransactionCallable
 import com.google.cloud.spanner.{DatabaseClient, Key, KeySet, Mutation, ResultSet, ResultSets, Statement, Struct, TransactionContext, Type, Value => SValue}
+import com.sopranoworks.bolt.statements.Update
 import org.antlr.v4.runtime._
 import org.slf4j.LoggerFactory
 
@@ -41,6 +42,10 @@ object Bolt {
     def transactionContext: Option[TransactionContext] = _transactionContext
 
     def database = Database(dbClient)
+
+    private [bolt] def addMutations(ms:List[Mutation]):Unit = _mutations ++= ms
+    private [bolt] def mutations = _mutations
+    private [bolt] def clearMutations():Unit = _mutations = List.empty[Mutation]
 
     /**
       * Executing INSERT/UPDATE/DELETE query on Google Cloud Spanner
@@ -243,146 +248,8 @@ object Bolt {
       }
     }
 
-    private def _getTargetKeysAndValues(transaction: TransactionContext,
-                                        tbl:Table,
-                                        where:String,
-                                        usedColumns:List[TableColumnValue]):(List[TableColumnValue],List[List[Value]]) = {
-      val keyNames = tbl.primaryKey.columns.filter(col=> !usedColumns.exists(_.name == col.name)).map(col => TableColumnValue(col.name,tbl.name,col.position)) ++ usedColumns
-      val resSet = transaction.executeQuery(Statement.of(s"SELECT ${keyNames.map(_.name).mkString(",")} FROM ${tbl.name} $where"))
-      val reader = new ColumnReader {}
-
-      (keyNames,
-        resSet.autoclose {
-          res =>
-            res.map {
-              row =>
-                (0 until row.getColumnCount).map(i=>reader.getColumn(row,i)).toList
-            }.toList
-        })
-    }
-
-    private def _composeUpdateMutations(tr:TransactionContext,tableName:String,
-                                        keysAndValues:java.util.List[KeyValue],
-                                        where:Where,
-                                        usedColumns:Map[String,TableColumnValue]):List[Mutation] = {
-      val tbl = database.table(tableName).get
-      val cols = usedColumns.values.toList
-
-      if (cols.isEmpty) where.eval()
-
-      if (where.isOptimizedWhere) {
-        val m = Mutation.newUpdateBuilder(tableName)
-        where.setPrimaryKeys(m)
-        keysAndValues.foreach {
-          case KeyValue(k,v) =>
-            v.eval.asValue.setTo(m,k)
-        }
-        List(m.build())
-      } else {
-        val (keys, values) = _getTargetKeysAndValues(tr, tbl, where.whereStmt, cols)
-
-        values.map {
-          row =>
-            keys.zip(row).foreach {
-              case (k, v) =>
-                k.setValue(v)
-            }
-
-            val m = Mutation.newUpdateBuilder(tableName)
-
-            // set primary key value
-            tbl.primaryKey.columns.foreach(col => keys.find(_.name == col.name).foreach {
-              v =>
-                v.setTo(m, v.name)
-            })
-
-            //
-            keysAndValues.foreach {
-              case KeyValue(k, v) =>
-                v.invalidateEvaluatedValueIfContains(cols)
-                v.eval.asValue.setTo(m, k)
-            }
-            m.build()
-        }
-      }
-    }
-
-    /**
-      * Internal use
-      */
-    def update(tableName:String,keysAndValues:java.util.List[KeyValue],where:Where):Unit = {
-      val usedColumns =
-        keysAndValues.foldLeft(Map.empty[String,TableColumnValue]) {
-          case (col,kv) =>
-            kv.value.resolveReference(col)
-        }
-
-      _transactionContext match {
-        case Some(tr) =>
-          _mutations ++= _composeUpdateMutations(tr,tableName,keysAndValues,where,usedColumns)
-
-        case None =>
-          Option(dbClient).foreach(_.readWriteTransaction()
-            .run(new TransactionCallable[Unit] {
-              override def run(transaction: TransactionContext):Unit = {
-                val ml = _composeUpdateMutations(transaction,tableName,keysAndValues,where,usedColumns)
-                if (ml.nonEmpty) transaction.buffer(ml)
-              }
-            }))
-      }
-    }
-
-    private def _updateSelect(tableName: String, columns:java.util.List[String], subquery: SubqueryValue, where: Where, tr: TransactionContext):Unit = {
-      val tbl = database.table(tableName).get
-      tbl.primaryKey.columns.foreach(k => if (columns.contains(k.name)) throw new RuntimeException(s"${k.name} is primary key"))
-
-      val (keys, values) = _getTargetKeysAndValues(tr, tbl, where.whereStmt, Nil)
-      val res = subquery.eval.asInstanceOf[SubqueryValue].results
-      val reader = new ColumnReader {}
-      val ml = res.map {
-        r =>
-          values.zip(r).map {
-            case (keyValues, vs) =>
-              if (columns.length != vs.getColumnCount)
-                throw new RuntimeException("")
-
-              val m = Mutation.newUpdateBuilder(tableName)
-
-              keys.zip(keyValues).foreach {
-                case (k, v) =>
-                  v.setTo(m, k.name)
-              }
-              var idx = 0
-              columns.foreach {
-                col =>
-                  reader.getColumn(vs, idx).setTo(m, col)
-                  idx += 1
-              }
-              m.build()
-          }
-      }
-      ml.foreach {
-        mm =>
-          _mutations ++= mm
-      }
-    }
-
-    def update(tableName:String,columns:java.util.List[String],subquery:SubqueryValue,where:Where):Unit = {
-      _transactionContext match {
-        case Some(tr) =>
-          _updateSelect(tableName, columns, subquery, where, tr)
-        case None =>
-          Option(dbClient).foreach(_.readWriteTransaction()
-            .run(new TransactionCallable[Unit] {
-              override def run(transaction: TransactionContext): Unit = {
-                _updateSelect(tableName, columns, subquery, where, transaction)
-                if (_mutations.nonEmpty) {
-                  transaction.buffer(_mutations)
-                  _mutations = List.empty[Mutation]
-                }
-              }
-            }))
-      }
+    def execute(update:Update):Unit = {
+      update.execute()
     }
 
     /**
