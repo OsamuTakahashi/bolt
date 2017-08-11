@@ -214,7 +214,13 @@ object Bolt {
           }
       }
     }
-    def executeNativeQuery(sql:String):ResultSet =
+
+    /**
+      * An executing native spanner query method
+      * @param sql SELECT query
+      * @return The result of the query
+      */
+    private [bolt] def executeNativeQuery(sql:String):ResultSet =
       _transactionContext match {
         case Some(tr) =>
           tr.executeQuery(Statement.of(sql))
@@ -222,7 +228,12 @@ object Bolt {
           dbClient.singleUse().executeQuery(Statement.of(sql))
       }
 
-    def executeNativeAdminQuery(admin:Admin,sql:String):Unit = {
+    /**
+      * An execiting native admin query method
+      * @param admin an admin instance
+      * @param sql CREATE/DROP/ALTER query
+      */
+    private [bolt] def executeNativeAdminQuery(admin:Admin,sql:String):Unit = {
       Option(admin) match {
         case Some(a) =>
           val op = a.adminClient.updateDatabaseDdl(a.instance,a.databaes,List(sql),null)
@@ -233,7 +244,7 @@ object Bolt {
       }
     }
 
-    private def _getTargetKeys(transaction: TransactionContext,tableName:String,where:String):List[List[String]] = {
+/*    private def _getTargetKeys(transaction: TransactionContext,tableName:String,where:String):List[List[String]] = {
       val tbl = database.table(tableName).get
       val keyNames = tbl.primaryKey.columns.map(_.name)
       val resSet = transaction.executeQuery(Statement.of(s"SELECT ${keyNames.mkString(",")} FROM $tableName $where"))
@@ -246,16 +257,16 @@ object Bolt {
               (0 until row.getColumnCount).map(i=>reader.getColumn(row,i).text).toList
           }.toList
       }
-    }
+    } */
 
-    def execute(update:Update):Unit = {
+    private [bolt] def execute(update:Update):Unit = {
       update.execute()
     }
 
     /**
       * Internal use
       */
-    def delete(tableName:String,where:Where):Unit = {
+    /*def delete(tableName:String,where:Where):Unit = {
       Option(where) match {
         case Some(Where(_,_,w,_)) =>
           _transactionContext match {
@@ -298,7 +309,7 @@ object Bolt {
           Option(dbClient).foreach(_.write(List(m)))
         case _ =>
       }
-    }
+    } */
 
     // Utility methods (for client application)
 

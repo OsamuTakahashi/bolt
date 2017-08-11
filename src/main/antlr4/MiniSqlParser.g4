@@ -352,7 +352,8 @@ update_stmt
 delete_stmt returns [ ResultSet resultSet = null ]
             locals [ Where where = null ]
         : DELETE { qc = new QueryContext(nut,qc); } FROM ID { currentTable = $ID.text; } (where_stmt { $where = $where_stmt.where; })? {
-            nut.delete(currentTable,$where);
+//            nut.delete(currentTable,$where);
+            nut.execute(new Delete(nut,qc,currentTable,$where));
             qc = qc.parent();
           }
         ;
