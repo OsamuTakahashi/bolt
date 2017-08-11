@@ -12,11 +12,10 @@ package com.sopranoworks.bolt
 
 import java.io.ByteArrayInputStream
 
-import com.sopranoworks.bolt.values._
 import com.google.cloud.Date
 import com.google.cloud.spanner.TransactionRunner.TransactionCallable
-import com.google.cloud.spanner.{DatabaseClient, Key, KeySet, Mutation, ResultSet, ResultSets, Statement, Struct, TransactionContext, Type, Value => SValue}
-import com.sopranoworks.bolt.statements.Update
+import com.google.cloud.spanner.{DatabaseClient, Mutation, ResultSet, ResultSets, Statement, Struct, TransactionContext, Type, Value => SValue}
+import com.sopranoworks.bolt.statements.NoResult
 import org.antlr.v4.runtime._
 import org.slf4j.LoggerFactory
 
@@ -75,146 +74,9 @@ object Bolt {
       }
     }
 
+    @inline
     def executeQuery(sql:String): ResultSet = executeQuery(sql,null,null)
-
-    /**
-      * Internal use
-      */
-    def isKey(tableName:String,columnName:String):Boolean =
-      Database(dbClient).table(tableName).get.primaryKey.equalKeys(List(columnName)) // !! TEMPORARY !!
-
-    private def _tableColumns(tableName:String) =
-      database.table(tableName) match {
-        case Some(tbl) =>
-          tbl.columns
-        case None =>
-          throw new RuntimeException(s"Table not found $tableName")
-      }
-
-    /**
-      * Internal use
-      */
-    def insert(tableName:String,values:java.util.List[Value]):Unit = {
-      val m = Mutation.newInsertBuilder(tableName)
-      _tableColumns(tableName).zip(values).foreach {
-        case (k,v) =>
-          v.eval.asValue.setTo(m,k.name)
-      }
-      _transactionContext match {
-        case Some(_) =>
-          _mutations ++= List(m.build())
-        case _ =>
-          Option(dbClient).foreach(_.write(List(m.build())))
-      }
-    }
-
-    def insert(tableName:String,columns:java.util.List[String],values:java.util.List[Value]):Unit = {
-      val m = Mutation.newInsertBuilder(tableName)
-      columns.zip(values).foreach {
-        case (k,v) =>
-          v.eval.asValue.setTo(m,k)
-      }
-      _transactionContext match {
-        case Some(_) =>
-          _mutations ++= List(m.build())
-        case _ =>
-          Option(dbClient).foreach(_.write(List(m.build())))
-      }
-    }
-
-    def bulkInsert(tableName:String,columns:java.util.List[String],values:java.util.List[java.util.List[Value]]):Unit = {
-      val mm = values.map {
-        v =>
-          val m = Mutation.newInsertBuilder(tableName)
-          columns.zip(v).foreach {
-            case (k,vv) =>
-              vv.eval.asValue.setTo(m,k)
-          }
-          m.build()
-      }
-
-      _transactionContext match {
-        case Some(_) =>
-          _mutations ++= mm
-        case _ =>
-          Option(dbClient).foreach(_.write(mm))
-      }
-    }
-
-    def bulkInsert(tableName:String,values:java.util.List[java.util.List[Value]]):Unit = {
-//      val m = Mutation.newInsertBuilder(tableName)
-      val columns = _tableColumns(tableName)
-      val mm = values.map {
-        v =>
-          val m = Mutation.newInsertBuilder(tableName)
-          columns.zip(v).foreach {
-            case (k,vv) =>
-              vv.eval.asValue.setTo(m,k.name)
-          }
-          m.build()
-      }
-
-      _transactionContext match {
-        case Some(_) =>
-          _mutations ++= mm
-        case _ =>
-          Option(dbClient).foreach(_.write(mm))
-      }
-    }
-
-    def insertSelect(tableName:String,subquery:SubqueryValue):Unit = {
-      val columns = _tableColumns(tableName)
-      val reader = new ColumnReader {}
-      val ml = subquery.eval.asInstanceOf[SubqueryValue].results.map(_.map {
-        st =>
-          if (st.getColumnCount != columns.length)
-            throw new RuntimeException("")
-
-          val m = Mutation.newInsertBuilder(tableName)
-          columns.foreach {
-            col =>
-              reader.getColumn(st,col.position).asValue.setTo(m,col.name)
-          }
-          m.build()
-      })
-      ml.foreach {
-        mm =>
-          _transactionContext match {
-            case Some(_) =>
-              _mutations ++= mm
-            case _ =>
-              Option(dbClient).foreach(_.write(mm))
-          }
-      }
-    }
-
-    def insertSelect(tableName:String,columns:java.util.List[String],subquery:SubqueryValue):Unit = {
-      val reader = new ColumnReader {}
-      val ml = subquery.eval.asInstanceOf[SubqueryValue].results.map(_.map {
-        st =>
-          if (st.getColumnCount != columns.length)
-            throw new RuntimeException("")
-
-          val m = Mutation.newInsertBuilder(tableName)
-          var idx = 0
-          columns.foreach {
-            col =>
-              reader.getColumn(st,idx).setTo(m,col)
-              idx += 1
-          }
-          m.build()
-      })
-      ml.foreach {
-        mm =>
-          _transactionContext match {
-            case Some(_) =>
-              _mutations ++= mm
-            case _ =>
-              Option(dbClient).foreach(_.write(mm))
-          }
-      }
-    }
-
+    
     /**
       * An executing native spanner query method
       * @param sql SELECT query
@@ -244,72 +106,9 @@ object Bolt {
       }
     }
 
-/*    private def _getTargetKeys(transaction: TransactionContext,tableName:String,where:String):List[List[String]] = {
-      val tbl = database.table(tableName).get
-      val keyNames = tbl.primaryKey.columns.map(_.name)
-      val resSet = transaction.executeQuery(Statement.of(s"SELECT ${keyNames.mkString(",")} FROM $tableName $where"))
-      val reader = new ColumnReader {}
-
-      resSet.autoclose {
-        res =>
-          res.map {
-            row =>
-              (0 until row.getColumnCount).map(i=>reader.getColumn(row,i).text).toList
-          }.toList
-      }
-    } */
-
-    private [bolt] def execute(update:Update):Unit = {
-      update.execute()
+    private [bolt] def execute(stmt:NoResult):Unit = {
+      stmt.execute()
     }
-
-    /**
-      * Internal use
-      */
-    /*def delete(tableName:String,where:Where):Unit = {
-      Option(where) match {
-        case Some(Where(_,_,w,_)) =>
-          _transactionContext match {
-            case Some(tr) =>
-              if (where.isOptimizedWhere) {
-                _mutations :+= where.asDeleteMutation
-              } else {
-                val keys = _getTargetKeys(tr, tableName, w)
-                if (keys.nonEmpty) {
-                  val ml = keys.map {
-                    k =>
-                      Mutation.delete(tableName, Key.of(k: _*))
-                  }
-                  _mutations ++= ml
-                }
-              }
-
-            case _ =>
-              if (where.isOptimizedWhere) {
-                Option(dbClient).foreach(_.write(List(where.asDeleteMutation)))
-              } else {
-                Option(dbClient).foreach(_.readWriteTransaction()
-                  .run(new TransactionCallable[Unit] {
-                    override def run(transaction: TransactionContext):Unit = {
-                        val keys = _getTargetKeys(transaction, tableName, w)
-                        if (keys.nonEmpty) {
-                          val ml = keys.map {
-                            k =>
-                              Mutation.delete(tableName, Key.of(k: _*))
-                          }
-                          transaction.buffer(ml)
-                        }
-                      }
-                    }
-                  ))}
-          }
-
-        case None =>
-          val m = Mutation.delete(tableName,KeySet.all())
-          Option(dbClient).foreach(_.write(List(m)))
-        case _ =>
-      }
-    } */
 
     // Utility methods (for client application)
 
@@ -417,7 +216,7 @@ object Bolt {
       * Currently, when 'throws' is used in the grammar, it will cause strange result on compile time.
       * TODO: Modify to use 'throws' when it is resolved.
       */
-    def changeDatabase(name:String):Unit =
+    private [bolt] def changeDatabase(name:String):Unit =
       throw DatabaseChangedException(name)
 
 

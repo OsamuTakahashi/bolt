@@ -15,7 +15,7 @@ import com.google.cloud.spanner.{Statement, TransactionContext}
 import com.sopranoworks.bolt.values.{TableColumnValue, Value}
 import com.sopranoworks.bolt._
 
-trait Update {
+trait Update extends NoResult {
   import Bolt._
 
   def nut:Bolt.Nut
@@ -52,6 +52,4 @@ trait Update {
           }.toList
       })
   }
-  
-  def execute():Unit
 }

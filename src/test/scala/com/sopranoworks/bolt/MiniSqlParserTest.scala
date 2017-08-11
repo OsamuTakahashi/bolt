@@ -16,7 +16,7 @@ import java.util
 
 import com.google.cloud.spanner.{DatabaseClient, ResultSet}
 import com.sopranoworks.bolt.Bolt.Nut
-import com.sopranoworks.bolt.statements.{Delete, SimpleUpdate, Update}
+import com.sopranoworks.bolt.statements._
 import com.sopranoworks.bolt.values._
 import org.antlr.v4.runtime.{ANTLRInputStream, BailErrorStrategy, CommonTokenStream}
 import org.specs2.mutable.Specification
@@ -43,31 +43,18 @@ class MiniSqlParserTest extends Specification {
       null
     }
 
-    override def insert(tableName: String, values: util.List[Value]): Unit = {
-      queryString = values.map(_.text).mkString(",")
-    }
-
-    override def insertSelect(tableName: String, subquery: SubqueryValue): Unit = {
-      queryString = subquery.text
-    }
-
-//    override def delete(tableName: String, where: Where): Unit = {
-//      queryString = where.whereStmt
-//    }
-
-    //    override def update(tableName: String, keysAndValues: util.List[KeyValue], where: Where): Unit = {
-    //      queryString = keysAndValues.get(0).value.eval.asValue.text
-    //    }
-    override def execute(update: Update): Unit = {
-      update match {
+    override def execute(stmt: NoResult): Unit = {
+      stmt match {
+        case SimpleInsert(_,_,_,_,values) =>
+          queryString = values.map(_.text).mkString(",")
+        case InsertSelect(_,_,_,_,subquery) =>
+          queryString = subquery.text
         case SimpleUpdate(_,_,_,keysAndValues,_) =>
           queryString = keysAndValues.get(0).value.eval.asValue.text
         case Delete(_,_,_,w) =>
           queryString = w.whereStmt
       }
     }
-
-    override def isKey(tableName: String, columnName: String): Boolean = false
   }
 
   private def _createParser(sql:String) = {

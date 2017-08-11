@@ -307,24 +307,30 @@ insert_stmt returns [ ResultSet resultSet = null ]
         : INSERT { qc = new QueryContext(nut,qc); } INTO? tbl=ID (AS? alias)? ( '(' ID { $columns.add($ID.text); } (',' ID { $columns.add($ID.text); } )*  ')' )?
             VALUES values {
               if ($columns.size() == 0)
-                nut.insert($tbl.text,$values.valueList);
+//                nut.insert($tbl.text,$values.valueList);
+                nut.execute(new SimpleInsert(nut,qc,$tbl.text,null,$values.valueList));
               else
-                nut.insert($tbl.text,$columns,$values.valueList);
+//                nut.insert($tbl.text,$columns,$values.valueList);
+                nut.execute(new SimpleInsert(nut,qc,$tbl.text,$columns,$values.valueList));
               qc = qc.parent();
             }
         | INSERT { ;qc = new QueryContext(nut,qc); } INTO? tbl=ID (AS? alias)? ( '(' ID { $columns.add($ID.text); } (',' ID { $columns.add($ID.text); } )*  ')' )?
             VALUES values { $bulkValues.add($values.valueList); } (',' values { $bulkValues.add($values.valueList); }) + {
               if ($columns.size() == 0)
-                nut.bulkInsert($tbl.text,$bulkValues);
+//                nut.bulkInsert($tbl.text,$bulkValues);
+                nut.execute(new BulkInsert(nut,qc,$tbl.text,null,$bulkValues));
               else
-                nut.bulkInsert($tbl.text,$columns,$bulkValues);
+//                nut.bulkInsert($tbl.text,$columns,$bulkValues);
+                nut.execute(new BulkInsert(nut,qc,$tbl.text,$columns,$bulkValues));
               qc = qc.parent();
             }
         | INSERT { qc = new QueryContext(nut,qc); } INTO? tbl=ID (AS? alias)? ( '(' ID { $columns.add($ID.text); } (',' ID { $columns.add($ID.text); } )*  ')' )? query_expr {
             if ($columns.size() == 0)
-              nut.insertSelect($tbl.text,$query_expr.v);
+//              nut.insertSelect($tbl.text,$query_expr.v);
+              nut.execute(new InsertSelect(nut,qc,$tbl.text,null,$query_expr.v));
             else
-              nut.insertSelect($tbl.text,$columns,$query_expr.v);
+//              nut.insertSelect($tbl.text,$columns,$query_expr.v);
+              nut.execute(new InsertSelect(nut,qc,$tbl.text,$columns,$query_expr.v));
           }
         ;
 
@@ -337,13 +343,11 @@ update_stmt
         : UPDATE { qc = new QueryContext(nut,qc); } table_name { currentTable = $table_name.text;qc.setCurrentTable($table_name.text); } (AS? alias { qc.addAlias(new TableAlias($alias.text,$table_name.text)); })?
             SET ID EQ expression { $kvs.add(new KeyValue($ID.text,$expression.v)); } ( ',' ID EQ expression { $kvs.add(new KeyValue($ID.text,$expression.v)); } )*
             where_stmt ( LIMIT ln=INT_VAL )? {
-//              nut.update(currentTable,$kvs,$where_stmt.where);
               nut.execute(new SimpleUpdate(nut,qc,currentTable,$kvs,$where_stmt.where));
               qc = qc.parent();
             }
         | UPDATE { qc = new QueryContext(nut,qc); } table_name { currentTable = $table_name.text; } (AS? alias { qc.addAlias(new TableAlias($alias.text,$table_name.text)); })?
             SET '(' ID { $columns.add($ID.text); } (',' ID { $columns.add($ID.text); })* ')' EQ '(' query_expr ')' where_stmt ( LIMIT ln=INT_VAL )? {
-//              nut.update(currentTable, $columns, $query_expr.v, $where_stmt.where);
               nut.execute(new UpdateSelect(nut,qc,currentTable, $columns, $query_expr.v, $where_stmt.where));
               qc = qc.parent();
             }
@@ -352,7 +356,6 @@ update_stmt
 delete_stmt returns [ ResultSet resultSet = null ]
             locals [ Where where = null ]
         : DELETE { qc = new QueryContext(nut,qc); } FROM ID { currentTable = $ID.text; } (where_stmt { $where = $where_stmt.where; })? {
-//            nut.delete(currentTable,$where);
             nut.execute(new Delete(nut,qc,currentTable,$where));
             qc = qc.parent();
           }
