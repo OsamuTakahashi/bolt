@@ -22,6 +22,7 @@ import org.slf4j.LoggerFactory
 import scala.collection.AbstractIterator
 import scala.collection.JavaConversions._
 import scala.collection.JavaConverters._
+import scala.language.implicitConversions
 
 /**
   * Created by takahashi on 2017/03/28.
@@ -39,6 +40,7 @@ object Bolt {
     private var _mutations = List.empty[Mutation]
 
     def transactionContext: Option[TransactionContext] = _transactionContext
+    private [bolt] def setTransactionContext(tr:TransactionContext):Unit = _transactionContext = Some(tr)
 
     def database = Database(dbClient)
 
@@ -296,6 +298,11 @@ object Bolt {
     def run(nat:Nut):T
   }
 
+  implicit def transactionContextToNut(tr:TransactionContext):Nut = {
+    val nut = new Nut(null)
+    nut.setTransactionContext(tr)
+    nut
+  }
 
   implicit def resultSetToIterator(resultSet: ResultSet):Iterator[ResultSet] = new AbstractIterator[ResultSet] {
     override def hasNext: Boolean =

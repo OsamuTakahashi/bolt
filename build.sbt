@@ -4,11 +4,13 @@ val projectScalaVersion = "2.11.8"
 
 val scalaVersions = Seq("2.11.8", "2.12.2")
 
+resolvers in Global += "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots"
+
 resolvers in Global += "scalaz-bintray" at "http://dl.bintray.com/scalaz/releases"
 
 val scalaLibrary = Seq("org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.6")
 
-val codebookLibrary = Seq("com.rusty-raven" %% "codebook-runtime" % "1.3.3" excludeAll(
+val codebookLibrary = Seq("com.rusty-raven" %% "codebook-runtime" % "1.3.4-SNAPSHOT" excludeAll(
   ExclusionRule(organization = "com.typesafe.akka"),
   ExclusionRule(organization = "net.liftweb")
 ))
