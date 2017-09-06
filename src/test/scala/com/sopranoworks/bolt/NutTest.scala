@@ -32,6 +32,7 @@ class NutTest extends Specification with BeforeAfterEach {
         |DELETE FROM TEST_ITEMS;
         |DELETE FROM FROM_TABLE;
         |DELETE FROM MULTI_KEY;
+        |DELETE FROM BOOL_COLUMN;
         |""".stripMargin))
   }
 
@@ -90,6 +91,14 @@ class NutTest extends Specification with BeforeAfterEach {
           |SELECT * FROM TEST_TABLE;
           |""".stripMargin)
         .autoclose(_.length) must_== 4
+    }
+    "insert bool value" in {
+      _dbClient.get.executeQuery(
+        """
+          |INSERT INTO BOOL_COLUMN  (id,flag) VALUES(1,true);
+          |SELECT * FROM BOOL_COLUMN;
+        """.stripMargin
+      ).autoclose(_.length) must_== 1
     }
   }
   "UPDATE" should {

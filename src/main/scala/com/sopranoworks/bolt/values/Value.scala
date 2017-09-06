@@ -122,6 +122,9 @@ case class BooleanValue(f:Boolean) extends Value with TextSetter with LiteralVal
   override def spannerType: Type = Type.bool()
   override def isEqualValue(v:Value):Boolean =
     v.isInstanceOf[BooleanValue] && v.asInstanceOf[BooleanValue].f == f
+
+  override def setTo(m: Mutation.WriteBuilder, key: String): Unit =
+    m.set(key).to(f)
 }
 
 case class IntValue(text:String,var value:Long = 0,var evaluated:Boolean = false) extends Value with TextSetter with LiteralValue {
