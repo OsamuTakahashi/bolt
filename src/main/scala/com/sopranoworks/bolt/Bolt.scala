@@ -198,7 +198,7 @@ object Bolt {
       val tbl = (List(s"CREATE TABLE IF NOT EXISTS $tableName (") ++
         _addComma(showColumns(tableName).map {
           col =>
-            s"  ${col.getString("COLUMN_NAME")} ${col.getString("SPANNER_TYPE")} ${if (col.getString("IS_NULLABLE").toUpperCase.startsWith("T")) "" else "NOT NULL"}"
+            s"  ${col.getString("COLUMN_NAME")} ${col.getString("SPANNER_TYPE")} ${if (col.getString("IS_NULLABLE").toUpperCase.startsWith("Y")) "" else "NOT NULL"}"
         }.toList) ++
         List(s") ${_primaryKeyForTable(tableName).map(k => s"PRIMARY KEY ($k)").getOrElse("") }", s"${ _deleteActionForTable(tableName).getOrElse(""); };") ++
         _showCreateIndexOnTable(tableName))
