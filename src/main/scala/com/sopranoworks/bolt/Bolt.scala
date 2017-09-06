@@ -298,9 +298,16 @@ object Bolt {
     def run(nat:Nut):T
   }
 
-  implicit def transactionContextToNut(tr:TransactionContext):Nut = {
-    val nut = new Nut(null)
-    nut.setTransactionContext(tr)
+  // Danger to use ?
+//  implicit def transactionContextToNut(tr:TransactionContext):Nut = {
+//    val nut = new Nut(null)
+//    nut.setTransactionContext(tr)
+//    nut
+//  }
+
+  implicit def dbClientAndTransactionContextToNut(pair:(DatabaseClient,TransactionContext)):Nut = {
+    val nut = new Nut(pair._1)
+    nut.setTransactionContext(pair._2)
     nut
   }
 
