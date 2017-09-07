@@ -93,7 +93,7 @@ object Main extends App {
   }
   case class Options(projectId:Option[String] = None,instanceName:Option[String] = None,database:Option[String] = None,table:Option[String] = None,password:Option[String] = None,sqls:Seq[File] = Seq.empty[File])
 
-  val optParser = new scopt.OptionParser[Options]("spanner-cli") {
+  val optParser = new scopt.OptionParser[Options]("spanner-dump") {
     opt[String]('p',"projectId").action((x,c) => c.copy(projectId = Some(x)))
     opt[String]('i',"instance").action((x,c) => c.copy(instanceName = Some(x)))
     opt[String]('s',"secret").action((x,c) => c.copy(password = Some(x)))
@@ -101,8 +101,8 @@ object Main extends App {
     arg[String]("table").optional().action((x,c) => c.copy(table = Some(x)))
   }
 
-  def dumpTable(dbClient:DatabaseClient, nat:Nut, tbl:String):Unit = {
-    makeResult(nat.showCreateTable(tbl)).foreach(row=>println(row.map(_.init.tail).mkString("")))
+  def dumpTable(dbClient:DatabaseClient, nut:Nut, tbl:String):Unit = {
+    makeResult(nut.showCreateTable(tbl)).foreach(row=>println(row.map(_.init.tail).mkString("")))
     var loop = true
     var offset = 0
     while(loop) {
@@ -114,6 +114,44 @@ object Main extends App {
       loop = r.length == 100
       offset += 100
     }
+  }
+
+  def tableDependencyList(dbClient:DatabaseClient):List[String] = {
+    var res = List.empty[String]
+    var tableSet = Set.empty[String]
+    var tbls = dbClient.singleUse().executeQuery(Statement.of("SELECT TABLE_NAME,PARENT_TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA=\"\""))
+      .autoclose(_.map(res=>(res.getString(0),res.getStringOpt("PARENT_TABLE_NAME"))).toList)
+      .sortWith((a,b) => (a._2,b._2) match {
+      case (Some(a),Some(b)) =>
+        a.compareTo(b) < 0
+      case (None,Some(_)) =>
+        true
+      case (None,None) =>
+        true
+      case (Some(_),None) =>
+        false
+    })
+
+    var last = 0
+
+    while (tableSet.size != tbls.length) {
+      tbls.foreach {
+        case (n, None) =>
+          if (!tableSet.contains(n)) {
+            tableSet += n
+            res ::= n
+          }
+        case (n, Some(p)) =>
+          if (!tableSet.contains(n) && tableSet.contains(p)) {
+            tableSet += n
+            res ::= n
+          }
+      }
+
+      if (last == tableSet.size) throw new RuntimeException("Cyclic table dependency")
+      last = tableSet.size
+    }
+    res
   }
 
   optParser.parse(args,Options()) match {
@@ -140,9 +178,12 @@ object Main extends App {
         case Some(tbl) =>
           dumpTable(dbClient,nut,tbl)
         case None =>
-          val tbls = makeResult(dbClient.singleUse().executeQuery(Statement.of("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA=\"\"")))
-          tbls.foreach(tbl=>dumpTable(dbClient,nut,tbl.head.init.tail))
+//          val tbls = makeResult(dbClient.singleUse().executeQuery(Statement.of("SELECT TABLE_NAME,PARENT_TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA=\"\"")))
+//          tbls.foreach(tbl=>dumpTable(dbClient,nut,tbl.head.init.tail))
+          val tbls = tableDependencyList(dbClient)
+          tbls.foreach(tbl=>dumpTable(dbClient,nut,tbl))
       }
       spanner.close()
+    case None =>
   }
 }
