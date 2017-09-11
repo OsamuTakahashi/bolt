@@ -34,6 +34,7 @@ class NutTest extends Specification with BeforeAfterEach {
         |DELETE FROM FROM_TABLE;
         |DELETE FROM MULTI_KEY;
         |DELETE FROM BOOL_COLUMN;
+        |DELETE FROM ARRAY_COLUMN;
         |""".stripMargin))
   }
 
@@ -98,6 +99,30 @@ class NutTest extends Specification with BeforeAfterEach {
         """
           |INSERT INTO BOOL_COLUMN  (id,flag) VALUES(1,true);
           |SELECT * FROM BOOL_COLUMN;
+        """.stripMargin
+      ).autoclose(_.length) must_== 1
+    }
+    "insert empty array value" in {
+      _dbClient.get.executeQuery(
+        """
+          |INSERT INTO ARRAY_COLUMN  (id,arr) VALUES(1,[]);
+          |SELECT * FROM ARRAY_COLUMN;
+        """.stripMargin
+      ).autoclose(_.length) must_== 1
+    }
+    "insert array value" in {
+      _dbClient.get.executeQuery(
+        """
+          |INSERT INTO ARRAY_COLUMN  (id,arr) VALUES(1,[1]);
+          |SELECT * FROM ARRAY_COLUMN;
+        """.stripMargin
+      ).autoclose(_.length) must_== 1
+    }
+    "insert array value 2" in {
+      _dbClient.get.executeQuery(
+        """
+          |INSERT INTO ARRAY_COLUMN  (id,arr) VALUES(1,[1,2]);
+          |SELECT * FROM ARRAY_COLUMN;
         """.stripMargin
       ).autoclose(_.length) must_== 1
     }
@@ -185,6 +210,18 @@ class NutTest extends Specification with BeforeAfterEach {
           |""".stripMargin)
         .autoclose(_.headOption.get.getString(0)) must_== "from"
     }
+    "update two columns" in {
+      _dbClient.get.executeQuery("""
+          |INSERT INTO TEST_ITEMS VALUES(0,0,0,1);
+          |UPDATE TEST_ITEMS SET uid=1,count = count + 1 WHERE id=0;
+          |SELECT * from TEST_ITEMS WHERE id=0;
+        """.stripMargin)
+        .autoclose {
+          r =>
+            val h = r.headOption.get
+            (h.getLong("uid"),h.getLong("count"))
+        } must_== (1L,2L)
+    }
     "update with self column" in {
       _dbClient.get.executeQuery("""
           |INSERT INTO TEST_ITEMS VALUES(0,0,0,1);
@@ -200,6 +237,24 @@ class NutTest extends Specification with BeforeAfterEach {
           |SELECT * from TEST_ITEMS WHERE id=0;
         """.stripMargin)
         .autoclose(_.headOption.get.getLong("count")) must_== 3
+    }
+    "update array column" in {
+      _dbClient.get.executeQuery(
+        """
+          |INSERT INTO ARRAY_COLUMN  (id,arr) VALUES(1,[]);
+          |UPDATE ARRAY_COLUMN SET arr=[1,2] WHERE id=1;
+          |SELECT * FROM ARRAY_COLUMN WHERE id=1;
+        """.stripMargin
+      ).autoclose(_.headOption.get.getLongArray("arr").length) must_== 2
+    }
+    "update array column 2" in {
+      _dbClient.get.executeQuery(
+        """
+          |INSERT INTO ARRAY_COLUMN  (id,arr) VALUES(1,[]);
+          |UPDATE ARRAY_COLUMN SET arr=[-100] WHERE id=1;
+          |SELECT * FROM ARRAY_COLUMN WHERE id=1;
+        """.stripMargin
+      ).autoclose(_.headOption.get.getLongArray("arr").length) must_== 1
     }
   }
   "DELETE" should {

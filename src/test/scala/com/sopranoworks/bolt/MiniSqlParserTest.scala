@@ -650,13 +650,13 @@ class MiniSqlParserTest extends Specification {
       nut.queryString must_== sql
     }
     "SELECT 1+-1" in {
-      val sql = "SELECT 1+1"
+      val sql = "SELECT 1+-1"
       val (parser, nut) = _createParser(sql)
       parser.minisql()
       nut.queryString must_== sql
     }
     "SELECT 1++1" in {
-      val sql = "SELECT 1+1"
+      val sql = "SELECT 1++1"
       val (parser, nut) = _createParser(sql)
       parser.minisql()
       nut.queryString must_== sql

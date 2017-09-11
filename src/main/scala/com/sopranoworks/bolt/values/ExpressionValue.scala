@@ -18,7 +18,12 @@ package com.sopranoworks.bolt.values
   * @param right right expression value
   */
 case class ExpressionValue(op:String,left:Value,right:Value) extends WrappedValue {
-  override def text = s"(${left.text} $op ${right.text})"
+  override def text = (_ref,left,right) match {
+    case (Some(r),_,_) => r.text
+    case (_,a,null) => s"($op ${left.text})"
+    case _ => s"(${left.text} $op ${right.text})"
+  }
+
   override def eval: Value = {
     if (_ref.isEmpty) {
       val l = left.eval.stayUnresolved
