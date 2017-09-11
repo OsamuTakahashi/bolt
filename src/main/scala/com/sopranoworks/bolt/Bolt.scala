@@ -163,7 +163,7 @@ object Bolt {
     private def _deleteActionForTable(tableName:String):Option[String] = {
       val r = dbClient.singleUse().executeQuery(Statement.of(s"SELECT PARENT_TABLE_NAME,ON_DELETE_ACTION FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA='' AND TABLE_NAME='$tableName'")).map {
         row =>
-          s"${if (row.isNull(0)) "" else s"INTERLEAVE IN PARENT ${row.getString(0)}"} ${if (row.isNull(1)) "" else s"ON DELETE ${row.getString(1)}"}"
+          s"${if (row.isNull(0)) "" else s", INTERLEAVE IN PARENT ${row.getString(0)}"} ${if (row.isNull(1)) "" else s"ON DELETE ${row.getString(1)}"}"
       }
       r.toList.headOption
     }
