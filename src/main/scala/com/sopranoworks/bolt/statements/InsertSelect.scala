@@ -18,7 +18,7 @@ import com.sopranoworks.bolt.{Bolt, ColumnReader, QueryContext}
 import scala.collection.JavaConversions._
 
 case class InsertSelect(nut:Bolt.Nut,qc:QueryContext,tableName:String,columns:java.util.List[String],subquery:SubqueryValue) extends Insert {
-  def insertSelectWithoutColumns():Unit = {
+  private def _createMutationsWithoutColumns = {
     val columns = _tableColumns(tableName)
     val reader = new ColumnReader {}
     val ml = subquery.eval.asInstanceOf[SubqueryValue].results.map(_.map {
@@ -29,22 +29,24 @@ case class InsertSelect(nut:Bolt.Nut,qc:QueryContext,tableName:String,columns:ja
         val m = Mutation.newInsertBuilder(tableName)
         columns.foreach {
           col =>
-            reader.getColumn(st,col.position).asValue.setTo(m,col.name)
+            reader.getColumn(st, col.position).asValue.setTo(m, col.name)
         }
         m.build()
     })
-    ml.foreach {
-      mm =>
-        nut.transactionContext match {
-          case Some(_) =>
-            nut.addMutations(mm)
-          case _ =>
-            Option(nut.dbClient).foreach(_.write(mm))
-        }
-    }
+    ml
   }
 
-  private def insertSelectWithColumns():Unit = {
+  def insertSelectWithoutColumns():Unit =
+    nut.transactionContext match {
+      case Some(_) =>
+        _createMutationsWithoutColumns.foreach(nut.addMutations)
+      case _ =>
+        Option(nut.dbClient).foreach(
+          _ => nut.beginTransaction(_ =>insertSelectWithoutColumns())
+        )
+    }
+
+  private def _createMutationsWithColumns = {
     val reader = new ColumnReader {}
     val ml = subquery.eval.asInstanceOf[SubqueryValue].results.map(_.map {
       st =>
@@ -55,21 +57,23 @@ case class InsertSelect(nut:Bolt.Nut,qc:QueryContext,tableName:String,columns:ja
         var idx = 0
         columns.foreach {
           col =>
-            reader.getColumn(st,idx).setTo(m,col)
+            reader.getColumn(st, idx).setTo(m, col)
             idx += 1
         }
         m.build()
     })
-    ml.foreach {
-      mm =>
-        nut.transactionContext match {
-          case Some(_) =>
-            nut.addMutations(mm)
-          case _ =>
-            Option(nut.dbClient).foreach(_.write(mm))
-        }
-    }
+    ml
   }
+
+  private def insertSelectWithColumns():Unit =
+    nut.transactionContext match {
+      case Some(_) =>
+        _createMutationsWithColumns.foreach(nut.addMutations)
+      case _ =>
+        Option(nut.dbClient).foreach(
+          _ => nut.beginTransaction(_ => insertSelectWithColumns())
+        )
+    }
 
   override def execute(): Unit = {
     Option(columns) match {

@@ -59,16 +59,9 @@ case class UpdateSelect(nut:Bolt.Nut,qc:QueryContext,tableName:String,columns:ja
       case Some(tr) =>
         _updateSelect(tableName, columns, subquery, where, tr)
       case None =>
-        Option(nut.dbClient).foreach(_.readWriteTransaction()
-          .run(new TransactionCallable[Unit] {
-            override def run(transaction: TransactionContext): Unit = {
-              _updateSelect(tableName, columns, subquery, where, transaction)
-              if (nut.mutations.nonEmpty) {
-                transaction.buffer(nut.mutations)
-                nut.clearMutations()
-              }
-            }
-          }))
+        Option(nut.dbClient).foreach(
+          _ => nut.beginTransaction(_ => execute())
+        )
     }
   }
 }

@@ -67,24 +67,19 @@ case class SimpleUpdate(nut:Bolt.Nut,qc:QueryContext,tableName:String,keysAndVal
   }
 
   def execute():Unit = {
-    val usedColumns =
-      keysAndValues.foldLeft(Map.empty[String,TableColumnValue]) {
-        case (col,kv) =>
-          kv.value.resolveReference(col)
-      }
-
     nut.transactionContext match {
       case Some(tr) =>
+        val usedColumns =
+          keysAndValues.foldLeft(Map.empty[String,TableColumnValue]) {
+            case (col,kv) =>
+              kv.value.resolveReference(col)
+          }
         nut.addMutations(_composeUpdateMutations(tr,tableName,keysAndValues,where,usedColumns))
 
       case None =>
-        Option(nut.dbClient).foreach(_.readWriteTransaction()
-          .run(new TransactionCallable[Unit] {
-            override def run(transaction: TransactionContext):Unit = {
-              val ml = _composeUpdateMutations(transaction,tableName,keysAndValues,where,usedColumns)
-              if (ml.nonEmpty) transaction.buffer(ml)
-            }
-          }))
+        Option(nut.dbClient).foreach(
+          _ => nut.beginTransaction(_ => execute())
+        )
     }
   }
 }

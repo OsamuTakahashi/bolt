@@ -18,31 +18,46 @@ import com.sopranoworks.bolt.{Bolt, QueryContext}
 import scala.collection.JavaConversions._
 
 case class SimpleInsert(nut:Bolt.Nut,qc:QueryContext,tableName:String,columns:java.util.List[String],values:java.util.List[Value]) extends Insert {
-  private def _insertWithOutColumns():Unit = {
+
+  private def _createMutationsWithoutColumns = {
     val m = Mutation.newInsertBuilder(tableName)
     _tableColumns(tableName).zip(values).foreach {
-      case (k,v) =>
-        v.eval.asValue.setTo(m,k.name)
+      case (k, v) =>
+        v.eval.asValue.setTo(m, k.name)
     }
+    List(m.build())
+  }
+
+  private def _insertWithoutColumns():Unit = {
     nut.transactionContext match {
       case Some(_) =>
-        nut.addMutations(List(m.build()))
+        val m = _createMutationsWithoutColumns
+        nut.addMutations(m)
       case _ =>
-        Option(nut.dbClient).foreach(_.write(List(m.build())))
+        Option(nut.dbClient).foreach(
+          _=> nut.beginTransaction(_ =>_insertWithoutColumns())
+        )
     }
   }
 
-  private def _insertWithColumns():Unit = {
+  private def _createMutationsWithColumns = {
     val m = Mutation.newInsertBuilder(tableName)
     columns.zip(values).foreach {
-      case (k,v) =>
-        v.eval.asValue.setTo(m,k)
+      case (k, v) =>
+        v.eval.asValue.setTo(m, k)
     }
+    List(m.build())
+  }
+
+  private def _insertWithColumns():Unit = {
     nut.transactionContext match {
       case Some(_) =>
-        nut.addMutations(List(m.build()))
+        val m = _createMutationsWithColumns
+        nut.addMutations(m)
       case _ =>
-        Option(nut.dbClient).foreach(_.write(List(m.build())))
+        Option(nut.dbClient).foreach(
+          _=> nut.beginTransaction(_ => _insertWithColumns())
+        )
     }
   }
 
@@ -51,7 +66,7 @@ case class SimpleInsert(nut:Bolt.Nut,qc:QueryContext,tableName:String,columns:ja
       case Some(_) =>
         _insertWithColumns()
       case None =>
-        _insertWithOutColumns()
+        _insertWithoutColumns()
     }
   }
 }
