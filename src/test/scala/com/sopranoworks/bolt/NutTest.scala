@@ -1,5 +1,6 @@
 package com.sopranoworks.bolt
 
+import com.google.cloud.spanner.TransactionRunner.TransactionCallable
 import com.google.cloud.spanner._
 import com.typesafe.config.ConfigFactory
 import org.specs2.mutable.Specification
@@ -99,6 +100,17 @@ class NutTest extends Specification with BeforeAfterEach {
           |SELECT * FROM BOOL_COLUMN;
         """.stripMargin
       ).autoclose(_.length) must_== 1
+    }
+    "insert with outer transaction" in {
+      _dbClient.get.readWriteTransaction().run(
+        new TransactionCallable[Unit] {
+          override def run(transaction: TransactionContext):Unit = {
+            (_dbClient.get,transaction).executeQuery("INSERT INTO TEST_TABLE VALUES(103,'test insert');")
+          }
+        }
+      )
+      _dbClient.get.executeQuery("SELECT * FROM TEST_TABLE WHERE id=103;")
+        .autoclose(_.headOption.get.getString("name")) must_== "test insert"
     }
   }
   "UPDATE" should {

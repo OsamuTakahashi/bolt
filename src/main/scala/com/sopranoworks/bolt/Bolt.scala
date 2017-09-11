@@ -38,13 +38,22 @@ object Bolt {
   implicit class Nut(val dbClient: DatabaseClient) {
     private var _transactionContext: Option[TransactionContext] = None
     private var _mutations = List.empty[Mutation]
+    private var _outerTransction = false
 
     def transactionContext: Option[TransactionContext] = _transactionContext
-    private [bolt] def setTransactionContext(tr:TransactionContext):Unit = _transactionContext = Some(tr)
+    private [bolt] def setTransactionContext(tr:TransactionContext):Unit = {
+      _transactionContext = Some(tr)
+      _outerTransction = true
+    }
 
     def database = Database(dbClient)
 
-    private [bolt] def addMutations(ms:List[Mutation]):Unit = _mutations ++= ms
+    private [bolt] def addMutations(ms:List[Mutation]):Unit = {
+      if (_outerTransction)
+        _transactionContext.foreach(_.buffer(ms))
+      else
+        _mutations ++= ms
+    }
     private [bolt] def mutations = _mutations
     private [bolt] def clearMutations():Unit = _mutations = List.empty[Mutation]
 
