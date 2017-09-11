@@ -91,19 +91,21 @@ object Main extends App {
       resultSet.close()
     }
   }
-  case class Options(projectId:Option[String] = None,instanceName:Option[String] = None,database:Option[String] = None,table:Option[String] = None,password:Option[String] = None,sqls:Seq[File] = Seq.empty[File])
+  case class Options(projectId:Option[String] = None,instanceName:Option[String] = None,database:Option[String] = None,table:Option[String] = None,password:Option[String] = None,sqls:Seq[File] = Seq.empty[File],noData:Boolean = false)
 
   val optParser = new scopt.OptionParser[Options]("spanner-dump") {
     opt[String]('p',"projectId").action((x,c) => c.copy(projectId = Some(x)))
     opt[String]('i',"instance").action((x,c) => c.copy(instanceName = Some(x)))
     opt[String]('s',"secret").action((x,c) => c.copy(password = Some(x)))
-    opt[String]('d',"database").action((x,c) => c.copy(database = Some(x)))
+//    opt[String]('d',"database").action((x,c) => c.copy(database = Some(x)))
+    opt[Unit]('d',"no-data").action((_, c) => c.copy(noData = true))
+    arg[String]("db_name").action((x,c) => c.copy(database = Some(x)))
     arg[String]("table").optional().action((x,c) => c.copy(table = Some(x)))
   }
 
-  def dumpTable(dbClient:DatabaseClient, nut:Nut, tbl:String):Unit = {
+  def dumpTable(dbClient:DatabaseClient, nut:Nut, tbl:String, noData:Boolean):Unit = {
     makeResult(nut.showCreateTable(tbl)).foreach(row=>println(row.map(_.init.tail).mkString("")))
-    var loop = true
+    var loop = !noData
     var offset = 0
     while(loop) {
       val r = makeResult(dbClient.singleUse().executeQuery(Statement.of(s"SELECT * from $tbl LIMIT 100 OFFSET $offset ")))
@@ -176,12 +178,12 @@ object Main extends App {
 
       cfg.table match {
         case Some(tbl) =>
-          dumpTable(dbClient,nut,tbl)
+          dumpTable(dbClient,nut,tbl,cfg.noData)
         case None =>
 //          val tbls = makeResult(dbClient.singleUse().executeQuery(Statement.of("SELECT TABLE_NAME,PARENT_TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA=\"\"")))
 //          tbls.foreach(tbl=>dumpTable(dbClient,nut,tbl.head.init.tail))
           val tbls = tableDependencyList(dbClient)
-          tbls.foreach(tbl=>dumpTable(dbClient,nut,tbl))
+          tbls.foreach(tbl=>dumpTable(dbClient,nut,tbl,cfg.noData))
       }
       spanner.close()
     case None =>
