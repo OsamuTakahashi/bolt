@@ -153,7 +153,7 @@ object Main extends App {
       if (last == tableSet.size) throw new RuntimeException("Cyclic table dependency")
       last = tableSet.size
     }
-    res
+    res.reverse
   }
 
   optParser.parse(args,Options()) match {
