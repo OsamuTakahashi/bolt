@@ -10,10 +10,10 @@ resolvers in Global += "scalaz-bintray" at "http://dl.bintray.com/scalaz/release
 
 val scalaLibrary = Seq("org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.6")
 
-val codebookLibrary = Seq("com.rusty-raven" %% "codebook-runtime" % "1.3.4-SNAPSHOT" excludeAll(
-  ExclusionRule(organization = "com.typesafe.akka"),
-  ExclusionRule(organization = "net.liftweb")
-))
+//val codebookLibrary = Seq("com.rusty-raven" %% "codebook-runtime" % "1.3.5-SNAPSHOT" excludeAll(
+//  ExclusionRule(organization = "com.typesafe.akka"),
+//  ExclusionRule(organization = "net.liftweb")
+//))
 
 val spannerClientLibraries = Seq(
 //  "com.google.cloud" % "google-cloud-spanner" % "0.20.3-beta",  // not work with SIGILL hack
@@ -45,7 +45,7 @@ parallelExecution in ThisBuild := false
 
 fork in run := true
 
-val projectVersion = "0.15-SNAPSHOT"
+val projectVersion = "0.16-SNAPSHOT"
 
 val noJavaDoc = Seq(
   publishArtifact in (Compile, packageDoc) := false,
@@ -66,7 +66,7 @@ lazy val core = (project in file("."))
     libraryDependencies ++=
       scalaLibrary ++
       spannerClientLibraries ++
-      codebookLibrary ++
+//      codebookLibrary ++
       loggingLibraries ++
       testLibraries ++
       commonLibraries,
