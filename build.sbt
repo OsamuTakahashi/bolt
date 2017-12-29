@@ -10,11 +10,6 @@ resolvers in Global += "scalaz-bintray" at "http://dl.bintray.com/scalaz/release
 
 val scalaLibrary = Seq("org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.6")
 
-//val codebookLibrary = Seq("com.rusty-raven" %% "codebook-runtime" % "1.3.5-SNAPSHOT" excludeAll(
-//  ExclusionRule(organization = "com.typesafe.akka"),
-//  ExclusionRule(organization = "net.liftweb")
-//))
-
 val spannerClientLibraries = Seq(
 //  "com.google.cloud" % "google-cloud-spanner" % "0.20.3-beta",  // not work with SIGILL hack
   "com.google.cloud" % "google-cloud-spanner" % "0.19.0-beta",
@@ -45,7 +40,7 @@ parallelExecution in ThisBuild := false
 
 fork in run := true
 
-val projectVersion = "0.16-SNAPSHOT"
+val projectVersion = "0.16.1-SNAPSHOT"
 
 val noJavaDoc = Seq(
   publishArtifact in (Compile, packageDoc) := false,
@@ -66,11 +61,10 @@ lazy val core = (project in file("."))
     libraryDependencies ++=
       scalaLibrary ++
       spannerClientLibraries ++
-//      codebookLibrary ++
       loggingLibraries ++
       testLibraries ++
       commonLibraries,
-    dependencyOverrides += "io.netty" % "netty-tcnative-boringssl-static" % "1.1.33.Fork22",  // for SIGILL hack on old intel CPUs
+//    dependencyOverrides += "io.netty" % "netty-tcnative-boringssl-static" % "1.1.33.Fork22",  // for SIGILL hack on old intel CPUs
     pomExtra :=
       <url>https://github.com/OsamuTakahashi/bolt</url>
         <licenses>
@@ -120,8 +114,8 @@ lazy val client = (project in file("client"))
         val oldStrategy = (assemblyMergeStrategy in assembly).value
         oldStrategy(x)
     },
-    libraryDependencies ++= scoptLibrary ++ jlineLibrary,
-    dependencyOverrides += "io.netty" % "netty-tcnative-boringssl-static" % "1.1.33.Fork22"  // for SIGILL hack on old intel CPUs
+    libraryDependencies ++= scoptLibrary ++ jlineLibrary
+//    dependencyOverrides += "io.netty" % "netty-tcnative-boringssl-static" % "1.1.33.Fork22"  // for SIGILL hack on old intel CPUs
   ).dependsOn(core)
   .settings(noJavaDoc: _*)
 
@@ -153,7 +147,7 @@ lazy val dump = (project in file("dump"))
         val oldStrategy = (assemblyMergeStrategy in assembly).value
         oldStrategy(x)
     },
-    libraryDependencies ++= scoptLibrary ++ jlineLibrary,
-    dependencyOverrides += "io.netty" % "netty-tcnative-boringssl-static" % "1.1.33.Fork22"  // for SIGILL hack on old intel CPUs
+    libraryDependencies ++= scoptLibrary ++ jlineLibrary
+//    dependencyOverrides += "io.netty" % "netty-tcnative-boringssl-static" % "1.1.33.Fork22"  // for SIGILL hack on old intel CPUs
   ).dependsOn(core)
   .settings(noJavaDoc: _*)

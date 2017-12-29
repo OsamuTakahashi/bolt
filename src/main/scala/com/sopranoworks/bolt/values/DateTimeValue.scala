@@ -87,6 +87,7 @@ case class TimestampValue(var timestampText:String,private var _datetime :DateTi
 
   def timestamp = (_datetime,_nano)
   def datetime = _datetime
+  def nano = _nano
 }
 
 case class DateValue(textDate:String,private var dateTime:DateTime = null) extends DateTimeValue {
