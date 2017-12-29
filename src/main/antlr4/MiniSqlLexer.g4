@@ -1,5 +1,9 @@
 lexer grammar MiniSqlLexer;
 
+@header {
+import org.apache.commons.text.StringEscapeUtils;
+}
+
 fragment A:('a'|'A');
 fragment B:('b'|'B');
 fragment C:('c'|'C');
@@ -27,6 +31,44 @@ fragment X:('x'|'X');
 fragment Y:('y'|'Y');
 fragment Z:('z'|'Z');
 
+fragment CommonCharacter
+    : SimpleEscapeSequence
+    | OctEscapeSequence
+    | HexEscapeSequence
+    | UnicodeEscapeSequence
+    ;
+
+fragment SimpleEscapeSequence
+    : '\\\''
+    | '\\"'
+    | '\\`'
+    | '\\\\'
+    | '\\a'
+    | '\\b'
+    | '\\f'
+    | '\\n'
+    | '\\r'
+    | '\\t'
+    | '\\v'
+    ;
+
+fragment OctEscapeSequence
+    : '\\' [0-7][0-7][0-7]
+    ;
+
+fragment HexEscapeSequence
+    : '\\x' [0-9a-fA-F]
+    | '\\x' [0-9a-fA-F][0-9a-fA-F]
+    | '\\x' [0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]
+    | '\\x' [0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]
+    ;
+
+fragment UnicodeEscapeSequence
+    : '\\u' [0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]
+    | '\\U' [0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]
+            [0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]
+    ;
+    
 ADD     : A D D
         ;
 
@@ -389,8 +431,8 @@ DBL_VAL : (([1-9][0-9]*)? [0-9])? '.' [0-9]+ (E ('+'|'-')? [0-9]+)?
         ;
 
 
-STRING  : '\'' ~[\']* '\''
-        | '"' ~["]* '"'
+STRING  : '\'' (~['\\\r\n\u0085\u2028\u2029] | CommonCharacter)* '\'' { setText("'" + StringEscapeUtils.unescapeJava(getText().substring(1, getText().length()-1)) + "'"); }
+        | '"' (~["\\\r\n\u0085\u2028\u2029] | CommonCharacter)* '"'  { setText("\"" + StringEscapeUtils.unescapeJava(getText().substring(1, getText().length()-1)) + "\""); }
         ;
 
 WS      : [ \t]+ -> channel(HIDDEN)

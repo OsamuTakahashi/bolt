@@ -31,7 +31,8 @@ val testLibraries = Seq(
 
 val commonLibraries = Seq(
   "joda-time" % "joda-time" % "2.9.6",
-  "org.joda" % "joda-convert" % "1.8"
+  "org.joda" % "joda-convert" % "1.8",
+  "org.apache.commons" % "commons-text" % "1.2"
 )
 
 val jlineLibrary = Seq("jline" % "jline" % "2.14.3")
@@ -40,7 +41,7 @@ parallelExecution in ThisBuild := false
 
 fork in run := true
 
-val projectVersion = "0.16.1-SNAPSHOT"
+val projectVersion = "0.17.0-SNAPSHOT"
 
 val noJavaDoc = Seq(
   publishArtifact in (Compile, packageDoc) := false,

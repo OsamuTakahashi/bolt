@@ -15,7 +15,7 @@ class ResultSetToIteratorTest extends Specification with BeforeAfterEach {
   sequential
 
   import Bolt._
-  import codebook.runtime.util.SafeConfig._
+  //import codebook.runtime.util.SafeConfig._
 
   private var _options:Option[SpannerOptions] = None
   private var _dbClient:Option[DatabaseClient] = None
@@ -24,12 +24,12 @@ class ResultSetToIteratorTest extends Specification with BeforeAfterEach {
     val options = SpannerOptions.newBuilder()
 //    options.setProjectId()
 
-    config.getStringOpt("spanner.client_secret").foreach {
+    /*config.getStringOpt("spanner.client_secret").foreach {
       json =>
         println(s"use client secret:$json")
         val is = new FileInputStream(new File(json))
         options.setCredentials(GoogleCredentials.fromStream(is))
-    }
+    } */
     options.build()
   }
 

@@ -11,7 +11,7 @@
   */
 package com.sopranoworks.bolt
 
-import java.io.{BufferedReader, File, FileInputStream, InputStreamReader}
+import java.io._
 
 import com.google.auth.oauth2.GoogleCredentials
 import com.google.cloud.spanner._
@@ -120,12 +120,13 @@ object Main extends App {
     }
   }
 
-  case class Options(projectId:Option[String] = None,instanceName:Option[String] = None,database:Option[String] = None,createDatabase:Boolean = false,password:Option[String] = None,sqls:Seq[File] = Seq.empty[File])
+  case class Options(projectId:Option[String] = None,instanceName:Option[String] = None,database:Option[String] = None,createDatabase:Boolean = false,password:Option[String] = None,sqls:Option[String] = None)
 
   val optParser = new scopt.OptionParser[Options]("spanner-cli") {
     opt[String]('p',"projectId").action((x,c) => c.copy(projectId = Some(x)))
     opt[String]('i',"instance").action((x,c) => c.copy(instanceName = Some(x)))
     opt[String]('s',"secret").action((x,c) => c.copy(password = Some(x)))
+    opt[String]('e',"execute").action((x,c) => c.copy(sqls = Some(x)))
     opt[Unit]('c',"create").action((_,c) => c.copy(createDatabase = true))
     arg[String]("database").optional().action((x,c) => c.copy(database = Some(x)))
   }
@@ -158,8 +159,13 @@ object Main extends App {
 
       val p = System.console() != null
 
-      val it = if (!p) Iterator.continually(stream.readLine())
-        else Iterator.continually(reader.readLine(s"${if (prevString.nonEmpty) " " * displayName.length + "| " else displayName + "> "}"))
+      val it = cfg.sqls match {
+        case Some(sqls) =>
+           Iterator.continually(new BufferedReader(new InputStreamReader(new ByteArrayInputStream(sqls.getBytes))).readLine())
+        case None =>
+          if (!p) Iterator.continually(stream.readLine())
+          else Iterator.continually(reader.readLine(s"${if (prevString.nonEmpty) " " * displayName.length + "| " else displayName + "> "}"))
+      }
 
         it.takeWhile(l => l != null && l != "exit").foreach {
           line =>

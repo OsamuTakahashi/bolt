@@ -722,4 +722,12 @@ class MiniSqlParserTest extends Specification {
       parser.minisql() must throwA[RuntimeException]
     }
   }
+  "escaped string" should {
+    "normally success" in {
+      val sql = "INSERT INTO TEST_TABLE VALUES(\"\\\"[\\u0085]\\n'\")"
+      val (parser,nut) = _createParser(sql)
+      parser.minisql()
+      nut.queryString must_== "\"[\u0085]\n'"
+    }
+  }
 }

@@ -15,6 +15,7 @@ import java.io.{File, FileInputStream}
 
 import com.google.auth.oauth2.GoogleCredentials
 import com.google.cloud.spanner._
+import org.apache.commons.text.StringEscapeUtils
 
 import scala.collection.JavaConverters._
 
@@ -33,6 +34,9 @@ object Main extends App {
     config.projectId.foreach(options.setProjectId)
     options.build()
   }
+
+  def escapedString(str:String):String =
+    s"""\"${StringEscapeUtils.escapeJava(str)}\""""
 
   def makeResult(resultSet : ResultSet):List[List[String]] = {
     var columnLength = Array.empty[Int]
@@ -59,7 +63,7 @@ object Main extends App {
                   case v if v == Type.float64() =>
                     r.getDouble(i).toString
                   case v if v == Type.string() =>
-                    s"'${r.getString(i)}'"
+                    escapedString(r.getString(i))
                   case v if v == Type.timestamp() =>
                     s"'${r.getTimestamp(i).toString}'"
                   case v if v == Type.date() =>
@@ -71,7 +75,7 @@ object Main extends App {
                   case v if v == Type.array(Type.float64()) =>
                     s"[${r.getDoubleArray(i).mkString(",")}]"
                   case v if v == Type.array(Type.string()) =>
-                    s"[${r.getStringList(i).asScala.map(s=>s"'$s'").mkString(",")}]"
+                    s"[${r.getStringList(i).asScala.map(s=>escapedString(s)).mkString(",")}]"
                   case v if v == Type.array(Type.timestamp()) =>
                     s"[${r.getTimestampList(i).asScala.map(s=>s"'$s'").mkString(",")}]"
                   case v if v == Type.array(Type.date()) =>
