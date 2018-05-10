@@ -49,9 +49,9 @@ class MiniSqlParserTest extends Specification {
           queryString = values.map(_.text).mkString(",")
         case InsertSelect(_,_,_,_,subquery) =>
           queryString = subquery.text
-        case SimpleUpdate(_,_,_,keysAndValues,_) =>
+        case SimpleUpdate(_,_,_,keysAndValues,_,_) =>
           queryString = keysAndValues.get(0).value.eval.asValue.text
-        case Delete(_,_,_,w) =>
+        case Delete(_,_,_,w,_) =>
           queryString = w.whereStmt
       }
     }

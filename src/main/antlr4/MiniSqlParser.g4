@@ -335,28 +335,28 @@ insert_stmt returns [ ResultSet resultSet = null ]
         ;
 
 update_stmt
-            returns [ ResultSet resultSet = null ]
+            returns [ ResultSet resultSet = null, String hint = null ]
             locals [
               List<KeyValue> kvs = new ArrayList<KeyValue>(),
               List<String> columns = new ArrayList<String>()
             ]
-        : UPDATE { qc = new QueryContext(nut,qc); } table_name { currentTable = $table_name.text;qc.setCurrentTable($table_name.text); } (AS? alias { qc.addAlias(new TableAlias($alias.text,$table_name.text)); })?
+        : UPDATE { qc = new QueryContext(nut,qc); } table_name { currentTable = $table_name.text;qc.setCurrentTable($table_name.text); } (table_hint_expr { $hint = $table_hint_expr.text; })? (AS? alias { qc.addAlias(new TableAlias($alias.text,$table_name.text)); })?
             SET ID EQ expression { $kvs.add(new KeyValue($ID.text,$expression.v)); } ( ',' ID EQ expression { $kvs.add(new KeyValue($ID.text,$expression.v)); } )*
             where_stmt ( LIMIT ln=INT_VAL )? {
-              nut.execute(new SimpleUpdate(nut,qc,currentTable,$kvs,$where_stmt.where));
+              nut.execute(new SimpleUpdate(nut,qc,currentTable,$kvs,$where_stmt.where,$hint));
               qc = qc.parent();
             }
-        | UPDATE { qc = new QueryContext(nut,qc); } table_name { currentTable = $table_name.text; } (AS? alias { qc.addAlias(new TableAlias($alias.text,$table_name.text)); })?
+        | UPDATE { qc = new QueryContext(nut,qc); } table_name { currentTable = $table_name.text; } (table_hint_expr { $hint = $table_hint_expr.text; })? (AS? alias { qc.addAlias(new TableAlias($alias.text,$table_name.text)); })?
             SET '(' ID { $columns.add($ID.text); } (',' ID { $columns.add($ID.text); })* ')' EQ '(' query_expr ')' where_stmt ( LIMIT ln=INT_VAL )? {
-              nut.execute(new UpdateSelect(nut,qc,currentTable, $columns, $query_expr.v, $where_stmt.where));
+              nut.execute(new UpdateSelect(nut,qc,currentTable, $columns, $query_expr.v, $where_stmt.where,$hint));
               qc = qc.parent();
             }
         ;
 
-delete_stmt returns [ ResultSet resultSet = null ]
+delete_stmt returns [ ResultSet resultSet = null, String hint = null ]
             locals [ Where where = null ]
-        : DELETE { qc = new QueryContext(nut,qc); } FROM ID { currentTable = $ID.text; } (where_stmt { $where = $where_stmt.where; })? {
-            nut.execute(new Delete(nut,qc,currentTable,$where));
+        : DELETE { qc = new QueryContext(nut,qc); } FROM ID { currentTable = $ID.text; } (table_hint_expr { $hint = $table_hint_expr.text; })? (where_stmt { $where = $where_stmt.where; })? {
+            nut.execute(new Delete(nut,qc,currentTable,$where,$hint));
             qc = qc.parent();
           }
         ;

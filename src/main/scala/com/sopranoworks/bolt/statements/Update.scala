@@ -20,10 +20,10 @@ trait Update extends NoResult {
 
   def nut:Bolt.Nut
 
-  protected def _getTargetKeys(transaction: TransactionContext,tableName:String,where:String):List[List[String]] = {
+  protected def _getTargetKeys(transaction: TransactionContext,tableName:String,where:String,hint:String):List[List[String]] = {
     val tbl = nut.database.table(tableName).get
     val keyNames = tbl.primaryKey.columns.map(_.name)
-    val resSet = transaction.executeQuery(Statement.of(s"SELECT ${keyNames.mkString(",")} FROM $tableName $where"))
+    val resSet = transaction.executeQuery(Statement.of(s"SELECT ${keyNames.mkString(",")} FROM $tableName${if (hint != null) hint else ""} $where"))
     val reader = new ColumnReader {}
 
     resSet.autoclose {
@@ -38,9 +38,10 @@ trait Update extends NoResult {
   protected def _getTargetKeysAndValues(transaction: TransactionContext,
                                       tbl:Table,
                                       where:String,
-                                      usedColumns:List[TableColumnValue]):(List[TableColumnValue],List[List[Value]]) = {
+                                      usedColumns:List[TableColumnValue],
+                                      hint:String):(List[TableColumnValue],List[List[Value]]) = {
     val keyNames = tbl.primaryKey.columns.filter(col=> !usedColumns.exists(_.name == col.name)).map(col => TableColumnValue(col.name,tbl.name,col.position)) ++ usedColumns
-    val resSet = transaction.executeQuery(Statement.of(s"SELECT ${keyNames.map(_.name).mkString(",")} FROM ${tbl.name} $where"))
+    val resSet = transaction.executeQuery(Statement.of(s"SELECT ${keyNames.map(_.name).mkString(",")} FROM ${tbl.name}${if (hint != null) hint else ""} $where"))
     val reader = new ColumnReader {}
 
     (keyNames,

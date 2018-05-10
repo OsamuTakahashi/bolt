@@ -11,8 +11,9 @@ resolvers in Global += "scalaz-bintray" at "http://dl.bintray.com/scalaz/release
 val scalaLibrary = Seq("org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.6")
 
 val spannerClientLibraries = Seq(
-//  "com.google.cloud" % "google-cloud-spanner" % "0.20.3-beta",  // not work with SIGILL hack
-  "com.google.cloud" % "google-cloud-spanner" % "0.19.0-beta",
+//  "com.google.cloud" % "google-cloud-spanner" % "0.22.0-beta",  // not work with SIGILL hack
+//  "com.google.cloud" % "google-cloud-spanner" % "0.19.0-beta",
+  "com.google.cloud" % "google-cloud-spanner" % "0.40.0-beta",
   "com.google.auth" % "google-auth-library-oauth2-http" % "0.6.0",
   "com.google.guava" % "guava" % "21.0"
 ) 
@@ -41,7 +42,7 @@ parallelExecution in ThisBuild := false
 
 fork in run := true
 
-val projectVersion = "0.17.0-SNAPSHOT"
+val projectVersion = "0.19-SNAPSHOT"
 
 val noJavaDoc = Seq(
   publishArtifact in (Compile, packageDoc) := false,

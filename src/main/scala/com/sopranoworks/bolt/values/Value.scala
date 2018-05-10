@@ -105,7 +105,9 @@ trait LiteralValue
 
 case object NullValue extends Value {
   override def text: String = "NULL"
-  override def setTo(m: Mutation.WriteBuilder, key: String): Unit = {}
+  override def setTo(m: Mutation.WriteBuilder, key: String): Unit = {
+    m.set(key).to(null:java.lang.String)
+  }
   override def isEqualValue(v:Value):Boolean = v == NullValue
 }
 

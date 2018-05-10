@@ -18,12 +18,13 @@ import com.sopranoworks.bolt.{Bolt, KeyValue, QueryContext, Where}
 
 import scala.collection.JavaConversions._
 
-case class SimpleUpdate(nut:Bolt.Nut,qc:QueryContext,tableName:String,keysAndValues:java.util.List[KeyValue],where:Where) extends Update {
+case class SimpleUpdate(nut:Bolt.Nut,qc:QueryContext,tableName:String,keysAndValues:java.util.List[KeyValue],where:Where,hint:String = null) extends Update {
 
   private def _composeUpdateMutations(tr:TransactionContext,tableName:String,
                                       keysAndValues:java.util.List[KeyValue],
                                       where:Where,
-                                      usedColumns:Map[String,TableColumnValue]):List[Mutation] = {
+                                      usedColumns:Map[String,TableColumnValue],
+                                      hint:String):List[Mutation] = {
     val tbl = nut.database.table(tableName).get
     val cols = usedColumns.values.toList
 
@@ -38,7 +39,7 @@ case class SimpleUpdate(nut:Bolt.Nut,qc:QueryContext,tableName:String,keysAndVal
       }
       List(m.build())
     } else {
-      val (keys, values) = _getTargetKeysAndValues(tr, tbl, where.whereStmt, cols)
+      val (keys, values) = _getTargetKeysAndValues(tr, tbl, where.whereStmt, cols, hint)
 
       values.map {
         row =>
@@ -74,7 +75,7 @@ case class SimpleUpdate(nut:Bolt.Nut,qc:QueryContext,tableName:String,keysAndVal
             case (col,kv) =>
               kv.value.resolveReference(col)
           }
-        nut.addMutations(_composeUpdateMutations(tr,tableName,keysAndValues,where,usedColumns))
+        nut.addMutations(_composeUpdateMutations(tr,tableName,keysAndValues,where,usedColumns,hint))
 
       case None =>
         Option(nut.dbClient).foreach(

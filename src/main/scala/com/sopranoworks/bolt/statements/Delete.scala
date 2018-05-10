@@ -17,7 +17,7 @@ import com.sopranoworks.bolt.{Bolt, QueryContext, Where}
 
 import scala.collection.JavaConversions._
 
-case class Delete(nut:Bolt.Nut,qc:QueryContext,tableName:String,where:Where) extends Update {
+case class Delete(nut:Bolt.Nut,qc:QueryContext,tableName:String,where:Where,hint:String) extends Update {
 
   def execute():Unit = {
     Option(where) match {
@@ -27,7 +27,7 @@ case class Delete(nut:Bolt.Nut,qc:QueryContext,tableName:String,where:Where) ext
             if (where.isOptimizedWhere) {
               nut.addMutations(List(where.asDeleteMutation))
             } else {
-              val keys = _getTargetKeys(tr, tableName, w)
+              val keys = _getTargetKeys(tr, tableName, w, hint)
               if (keys.nonEmpty) {
                 val ml = keys.map {
                   k =>
@@ -44,7 +44,7 @@ case class Delete(nut:Bolt.Nut,qc:QueryContext,tableName:String,where:Where) ext
               Option(nut.dbClient).foreach(_.readWriteTransaction()
                 .run(new TransactionCallable[Unit] {
                   override def run(transaction: TransactionContext):Unit = {
-                      val keys = _getTargetKeys(transaction, tableName, w)
+                      val keys = _getTargetKeys(transaction, tableName, w, hint)
                       if (keys.nonEmpty) {
                         val ml = keys.map {
                           k =>

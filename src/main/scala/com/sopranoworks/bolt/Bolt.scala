@@ -14,7 +14,7 @@ import java.io.ByteArrayInputStream
 
 import com.google.cloud.Date
 import com.google.cloud.spanner.TransactionRunner.TransactionCallable
-import com.google.cloud.spanner.{DatabaseClient, Mutation, ResultSet, ResultSets, Statement, Struct, TransactionContext, Type, Value => SValue}
+import com.google.cloud.spanner.{AbortedException, DatabaseClient, Mutation, ResultSet, ResultSets, Statement, Struct, TransactionContext, Type, Value => SValue}
 import com.sopranoworks.bolt.statements.NoResult
 import org.antlr.v4.runtime._
 import org.slf4j.LoggerFactory
