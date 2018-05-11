@@ -43,6 +43,10 @@ class MiniSqlParserTest extends Specification {
       null
     }
 
+    override def executeNativeAdminQuery(admin: Admin, sql: String): Unit = {
+      queryString = sql
+    }
+
     override def execute(stmt: NoResult): Unit = {
       stmt match {
         case SimpleInsert(_,_,_,_,values) =>
@@ -673,6 +677,12 @@ class MiniSqlParserTest extends Specification {
       parser.minisql()
       nut.queryString must_== sql
     }
+    "SELECT MAX(x) AS max FROM UNNEST([8, NULL, 37, 4, NULL, 55]) AS x" in {
+      val sql = "SELECT MAX(x) AS max FROM UNNEST([8, NULL, 37, 4, NULL, 55]) AS x"
+      val (parser, nut) = _createParser(sql)
+      parser.minisql()
+      nut.queryString must_== sql
+    }
   }
   "INSERT" should {
     "INSERT INTO test_tbl VALUES(3, IF( (select count from test_tbl where id=2) > 0, 1, 0))" in {
@@ -728,6 +738,14 @@ class MiniSqlParserTest extends Specification {
       val (parser,nut) = _createParser(sql)
       parser.minisql()
       nut.queryString must_== "\"[\u0085]\n'"
+    }
+  }
+  "create" should {
+    "create table with string(MAX)" in {
+      val sql = "CREATE TABLE TEST_TABLE ( str STRING(MAX) NOT NULL) PRIMARY KEY (str)"
+      val (parser, nut) = _createParser(sql)
+      parser.minisql()
+      nut.queryString must_== sql
     }
   }
 }

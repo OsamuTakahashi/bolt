@@ -428,7 +428,11 @@ scalar_type returns [ Type tp = null ]
         ;
 
 length  : INT_VAL
-        | MAX
+        | ID {
+          if (!$ID.text.equalsIgnoreCase("MAX")) {
+            throw new ParseCancellationException(String.format("invalid identifier: %s",$ID.text));
+          }
+        }
         ;
 
 array_type returns [ Type tp = null ]
@@ -523,7 +527,7 @@ struct_value returns [ StructValue v = null; ]
 
 function returns [ Value v = null ]
         locals [ List<Value> vlist = new ArrayList<Value>(), String name = null ]
-        : (ID { $name = $ID.text; }| IF { $name="IF"; }| DATE { $name="DATE"; }) '(' (MUL | expression { $vlist.add($expression.v); } (',' expression { $vlist.add($expression.v); })* )? ')' {
+        : (ID { $name = $ID.text; }| IF { $name="IF"; }| DATE { $name="DATE"; } ) '(' (MUL | expression { $vlist.add($expression.v); } (',' expression { $vlist.add($expression.v); })* )? ')' {
             $v = new FunctionValueImpl($name.toUpperCase(),$vlist);
           }
         | EXTRACT '(' ID FROM expression ')' {

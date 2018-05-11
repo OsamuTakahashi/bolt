@@ -328,8 +328,8 @@ ARRAY   : A R R A Y
 STRUCT  : S T R U C T
         ;
 
-MAX     : M A X
-        ;
+//MAX     : M A X
+//        ;
 
 PLUS    : '+'
         ;
