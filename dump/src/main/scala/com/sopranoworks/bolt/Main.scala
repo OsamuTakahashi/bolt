@@ -128,8 +128,8 @@ object Main extends App {
     var tbls = dbClient.singleUse().executeQuery(Statement.of("SELECT TABLE_NAME,PARENT_TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA=\"\""))
       .autoclose(_.map(res=>(res.getString(0),res.getStringOpt("PARENT_TABLE_NAME"))).toList)
       .sortWith((a,b) => (a._2,b._2) match {
-      case (Some(a),Some(b)) =>
-        a.compareTo(b) < 0
+      case (Some(aa),Some(bb)) =>
+        aa.compareTo(bb) < 0
       case (None,Some(_)) =>
         true
       case (None,None) =>
