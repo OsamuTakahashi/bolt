@@ -15,6 +15,7 @@ import java.io.{File, FileInputStream}
 
 import com.google.auth.oauth2.GoogleCredentials
 import com.google.cloud.spanner._
+import org.apache.beam.sdk.io.gcp.spanner.SpannerConfig
 import org.apache.commons.text.StringEscapeUtils
 
 import scala.collection.JavaConverters._
@@ -95,30 +96,56 @@ object Main extends App {
       resultSet.close()
     }
   }
-  case class Options(projectId:Option[String] = None,instanceName:Option[String] = None,database:Option[String] = None,table:Option[String] = None,password:Option[String] = None,sqls:Seq[File] = Seq.empty[File],noData:Boolean = false)
+  case class Options(projectId:Option[String] = None,
+                     instanceName:Option[String] = None,
+                     database:Option[String] = None,
+                     table:Option[String] = None,
+                     password:Option[String] = None,
+                     sqls:Seq[File] = Seq.empty[File],
+                     noInfo:Boolean = false,
+                     noData:Boolean = false,
+                     userDataFlow:Boolean = false,
+                     dataStoreBase:Option[String] = None,
+                     runner:String = "DataflowRunner",
+                     workerMachineType:String = "n1-standard-1",
+                     zone:Option[String] = None)
 
   val optParser = new scopt.OptionParser[Options]("spanner-dump") {
     opt[String]('p',"projectId").action((x,c) => c.copy(projectId = Some(x)))
     opt[String]('i',"instance").action((x,c) => c.copy(instanceName = Some(x)))
     opt[String]('s',"secret").action((x,c) => c.copy(password = Some(x)))
 //    opt[String]('d',"database").action((x,c) => c.copy(database = Some(x)))
+    opt[Unit]('t',"no-create-info").action((_, c) => c.copy(noInfo = true))
     opt[Unit]('d',"no-data").action((_, c) => c.copy(noData = true))
     arg[String]("db_name").action((x,c) => c.copy(database = Some(x)))
     arg[String]("table").optional().action((x,c) => c.copy(table = Some(x)))
+    opt[Unit]("dataflow").optional().action((_,c) => c.copy(userDataFlow = true))
+    opt[String]("datastore-base").optional().action((x,c) => c.copy(dataStoreBase = Some(x)))
+    opt[String]("runner").optional().action((x,c) => c.copy(runner = x))
+    opt[String]("workerMachineType").optional().action((x,c) => c.copy(workerMachineType = x))
+    opt[String]("zone").optional().action((x,c) => c.copy(zone = Some(x)))
   }
 
-  def dumpTable(dbClient:DatabaseClient, nut:Nut, tbl:String, noData:Boolean):Unit = {
-    makeResult(nut.showCreateTable(tbl)).foreach(row=>println(row.map(_.init.tail).mkString("")))
-    var loop = !noData
-    var offset = 0
-    while(loop) {
-      val r = makeResult(dbClient.singleUse().executeQuery(Statement.of(s"SELECT * from $tbl LIMIT 100 OFFSET $offset ")))
-      if (r.nonEmpty) {
-        println(s"INSERT INTO $tbl VALUES")
-        println(r.map(row => s"  (${row.mkString(",")})").mkString(",\n") + ";")
+  def dumpTable(dbClient:DatabaseClient, nut:Nut, tbl:String, noInfo:Boolean, noData:Boolean,useDataFlow:Boolean,dataFlowArgs:Array[String],spannerConfig: Option[SpannerConfig]):Unit = {
+    if (!noInfo) {
+      makeResult(nut.showCreateTable(tbl)).foreach(row => println(row.map(_.init.tail).mkString("")))
+    }
+    if (!noData) {
+      if (useDataFlow) {
+        DataFlowDumper.dump(dataFlowArgs,spannerConfig.get,nut.database.table(tbl).get)
+      } else {
+        var loop = !noData
+        var offset = 0
+        while (loop) {
+          val r = makeResult(dbClient.singleUse().executeQuery(Statement.of(s"SELECT * from $tbl LIMIT 100 OFFSET $offset ")))
+          if (r.nonEmpty) {
+            println(s"INSERT INTO $tbl VALUES")
+            println(r.map(row => s"  (${row.mkString(",")})").mkString(",\n") + ";")
+          }
+          loop = r.length == 100
+          offset += 100
+        }
       }
-      loop = r.length == 100
-      offset += 100
     }
   }
 
@@ -176,18 +203,45 @@ object Main extends App {
         System.exit(1)
         ""
       }
+      var spannerConfig:Option[SpannerConfig] = None
+      val dataFlowArgs = if (cfg.userDataFlow) {
+        if (cfg.projectId.isEmpty || cfg.dataStoreBase.isEmpty || cfg.zone.isEmpty) {
+          optParser.showUsage()
+          System.exit(1)
+          Array.empty[String]
+        } else {
+//          val scfg = new TrueSpannerConfig//SpannerConfig.create()
+//          scfg.projectId = cfg.projectId.get
+//          scfg.instanceId = cfg.instanceName.get
+//          scfg.databaseId = cfg.database.get
+          spannerConfig = Some(SpannerConfig.create()
+            .withProjectId(cfg.projectId.get)
+            .withInstanceId(cfg.instanceName.get)
+            .withDatabaseId(cfg.database.get))
+
+          Array(
+            s"--project=${cfg.projectId.get}",
+            s"--zone=${cfg.zone.get}",
+            s"--runner=${cfg.runner}",
+            s"--workerMachineType=${cfg.workerMachineType}",
+            s"--output=${cfg.dataStoreBase.get}"
+          )
+        }
+      } else {
+        Array.empty[String]
+      }
       var admin = Admin(spanner.getDatabaseAdminClient, instance, dbName)
       var dbClient = spanner.getDatabaseClient(DatabaseId.of(options.getProjectId, instance, dbName))
       val nut = Nut(dbClient)
 
       cfg.table match {
         case Some(tbl) =>
-          dumpTable(dbClient,nut,tbl,cfg.noData)
+          dumpTable(dbClient,nut,tbl,cfg.noInfo,cfg.noData,cfg.userDataFlow,dataFlowArgs,spannerConfig)
         case None =>
 //          val tbls = makeResult(dbClient.singleUse().executeQuery(Statement.of("SELECT TABLE_NAME,PARENT_TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA=\"\"")))
 //          tbls.foreach(tbl=>dumpTable(dbClient,nut,tbl.head.init.tail))
           val tbls = tableDependencyList(dbClient)
-          tbls.foreach(tbl=>dumpTable(dbClient,nut,tbl,cfg.noData))
+          tbls.foreach(tbl=>dumpTable(dbClient,nut,tbl,cfg.noInfo,cfg.noData,cfg.userDataFlow,dataFlowArgs,spannerConfig))
       }
       spanner.close()
     case None =>

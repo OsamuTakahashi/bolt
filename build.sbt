@@ -11,12 +11,21 @@ resolvers in Global += "scalaz-bintray" at "http://dl.bintray.com/scalaz/release
 val scalaLibrary = Seq("org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.6")
 
 val spannerClientLibraries = Seq(
-//  "com.google.cloud" % "google-cloud-spanner" % "0.22.0-beta",  // not work with SIGILL hack
-//  "com.google.cloud" % "google-cloud-spanner" % "0.19.0-beta",
   "com.google.cloud" % "google-cloud-spanner" % "0.40.0-beta",
   "com.google.auth" % "google-auth-library-oauth2-http" % "0.6.0",
   "com.google.guava" % "guava" % "21.0"
 ) 
+
+val scioVersion = "0.5.1"
+
+def scioLibraries = Seq(
+  "com.spotify" %% "scio-core" % scioVersion,
+  "com.spotify" %% "scio-bigquery" % scioVersion,
+  "com.spotify" %% "scio-test" % scioVersion % "test",
+  "org.apache.beam" % "beam-runners-direct-java" % "2.4.0" % Test,
+  "org.apache.beam" % "beam-runners-google-cloud-dataflow-java" % "2.4.0",
+  "org.apache.beam" % "beam-sdks-java-io-google-cloud-platform" % "2.4.0"
+)
 
 val loggingLibraries = Seq(
   "ch.qos.logback" % "logback-classic" % "1.1.7"
@@ -42,7 +51,7 @@ parallelExecution in ThisBuild := false
 
 fork in run := true
 
-val projectVersion = "0.19.2-SNAPSHOT"
+val projectVersion = "0.20.0-SNAPSHOT"
 
 val noJavaDoc = Seq(
   publishArtifact in (Compile, packageDoc) := false,
@@ -117,7 +126,6 @@ lazy val client = (project in file("client"))
         oldStrategy(x)
     },
     libraryDependencies ++= scoptLibrary ++ jlineLibrary
-//    dependencyOverrides += "io.netty" % "netty-tcnative-boringssl-static" % "1.1.33.Fork22"  // for SIGILL hack on old intel CPUs
   ).dependsOn(core)
   .settings(noJavaDoc: _*)
 
@@ -149,7 +157,7 @@ lazy val dump = (project in file("dump"))
         val oldStrategy = (assemblyMergeStrategy in assembly).value
         oldStrategy(x)
     },
-    libraryDependencies ++= scoptLibrary ++ jlineLibrary
-//    dependencyOverrides += "io.netty" % "netty-tcnative-boringssl-static" % "1.1.33.Fork22"  // for SIGILL hack on old intel CPUs
+    libraryDependencies ++= scoptLibrary ++ jlineLibrary ++ scioLibraries,
+    dependencyOverrides += "com.google.cloud" % "google-cloud-spanner" % "0.20.0-beta"
   ).dependsOn(core)
   .settings(noJavaDoc: _*)

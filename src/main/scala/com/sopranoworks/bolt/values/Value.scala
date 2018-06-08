@@ -12,6 +12,7 @@
 package com.sopranoworks.bolt.values
 
 import com.google.cloud.spanner.{Mutation, Type}
+import org.apache.commons.text.StringEscapeUtils
 
 /**
   * Created by takahashi on 2017/03/29.
@@ -112,7 +113,10 @@ case object NullValue extends Value {
 }
 
 case class StringValue(text:String) extends Value with TextSetter with LiteralValue {
-  override def qtext:String = s"'$text'"
+  private def escapedString(str:String):String =
+    s"""\"${StringEscapeUtils.escapeJava(str)}\""""
+
+  override def qtext:String = s"'${escapedString(text)}'"
   override def spannerType: Type = Type.string()
   override def isEqualValue(v:Value):Boolean =
     v.isInstanceOf[StringValue] && v.asInstanceOf[StringValue].text == text
