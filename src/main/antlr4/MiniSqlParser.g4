@@ -225,7 +225,7 @@ bool_expression returns [ Value v = null ]
             }
           }
         | bit_or_expr nt2=NOT? IN { $params = new ArrayList<Value>(); }
-            ( array_expression { $params.add($array_expression.v); }
+            ( array_value { $params.add($array_value.v); }
                 | '(' query_expr { $params.add($query_expr.v); } ')'
                 | UNNEST '(' array_expression ')' { $params.add($array_expression.v); } ) {
             $v = new FunctionValueImpl("\$IN",$params);
@@ -260,6 +260,13 @@ array_expression
         | ID { $v = new IdentifierValue($ID.text,qc); }
         | field_path { $v = $field_path.v; }
         ;
+
+array_value
+        returns [ Value v = null ]
+        locals [ List<Value> valueList = new ArrayList<Value>() ]
+        : '(' expression { $valueList.add($expression.v); } (',' { $valueList.add($expression.v); } )* ')'
+        ;
+
 
 cast_expression
         returns [ Value v = null ]

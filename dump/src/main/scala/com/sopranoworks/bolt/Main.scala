@@ -95,7 +95,7 @@ object Main extends App {
       resultSet.close()
     }
   }
-  case class Options(projectId:Option[String] = None,instanceName:Option[String] = None,database:Option[String] = None,table:Option[String] = None,password:Option[String] = None,sqls:Seq[File] = Seq.empty[File],noData:Boolean = false)
+  case class Options(projectId:Option[String] = None,instanceName:Option[String] = None,database:Option[String] = None,table:Option[String] = None,password:Option[String] = None,sqls:Seq[File] = Seq.empty[File],noData:Boolean = false,where:Option[String] = None)
 
   val optParser = new scopt.OptionParser[Options]("spanner-dump") {
     opt[String]('p',"projectId").action((x,c) => c.copy(projectId = Some(x)))
@@ -103,16 +103,17 @@ object Main extends App {
     opt[String]('s',"secret").action((x,c) => c.copy(password = Some(x)))
 //    opt[String]('d',"database").action((x,c) => c.copy(database = Some(x)))
     opt[Unit]('d',"no-data").action((_, c) => c.copy(noData = true))
+    opt[String]('w',"where").optional().action((x,c) => c.copy(where = Some(x)))
     arg[String]("db_name").action((x,c) => c.copy(database = Some(x)))
     arg[String]("table").optional().action((x,c) => c.copy(table = Some(x)))
   }
 
-  def dumpTable(dbClient:DatabaseClient, nut:Nut, tbl:String, noData:Boolean):Unit = {
+  def dumpTable(dbClient:DatabaseClient, nut:Nut, tbl:String, noData:Boolean,where:Option[String]):Unit = {
     makeResult(nut.showCreateTable(tbl)).foreach(row=>println(row.map(_.init.tail).mkString("")))
     var loop = !noData
     var offset = 0
     while(loop) {
-      val r = makeResult(dbClient.singleUse().executeQuery(Statement.of(s"SELECT * from $tbl LIMIT 100 OFFSET $offset ")))
+      val r = makeResult(dbClient.singleUse().executeQuery(Statement.of(s"SELECT * from $tbl ${where.map(w=>s"WHERE $w").getOrElse("")} LIMIT 100 OFFSET $offset")))
       if (r.nonEmpty) {
         println(s"INSERT INTO $tbl VALUES")
         println(r.map(row => s"  (${row.mkString(",")})").mkString(",\n") + ";")
@@ -182,12 +183,12 @@ object Main extends App {
 
       cfg.table match {
         case Some(tbl) =>
-          dumpTable(dbClient,nut,tbl,cfg.noData)
+          dumpTable(dbClient,nut,tbl,cfg.noData,cfg.where)
         case None =>
 //          val tbls = makeResult(dbClient.singleUse().executeQuery(Statement.of("SELECT TABLE_NAME,PARENT_TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA=\"\"")))
 //          tbls.foreach(tbl=>dumpTable(dbClient,nut,tbl.head.init.tail))
           val tbls = tableDependencyList(dbClient)
-          tbls.foreach(tbl=>dumpTable(dbClient,nut,tbl,cfg.noData))
+          tbls.foreach(tbl=>dumpTable(dbClient,nut,tbl,cfg.noData,cfg.where))
       }
       spanner.close()
     case None =>
