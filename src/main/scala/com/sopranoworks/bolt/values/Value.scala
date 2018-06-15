@@ -114,7 +114,7 @@ case object NullValue extends Value {
 
 case class StringValue(text:String) extends Value with TextSetter with LiteralValue {
   private def escapedString(str:String):String =
-    s"""\"${StringEscapeUtils.escapeJava(str)}\""""
+    StringEscapeUtils.escapeJava(str)
 
   override def qtext:String = s"'${escapedString(text)}'"
   override def spannerType: Type = Type.string()

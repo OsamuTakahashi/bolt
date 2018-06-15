@@ -11,8 +11,9 @@ resolvers in Global += "scalaz-bintray" at "http://dl.bintray.com/scalaz/release
 val scalaLibrary = Seq("org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.6")
 
 val spannerClientLibraries = Seq(
-  "com.google.cloud" % "google-cloud-spanner" % "0.40.0-beta",
-  "com.google.auth" % "google-auth-library-oauth2-http" % "0.6.0",
+//  "com.google.cloud" % "google-cloud-spanner" % "0.40.0-beta",
+  "com.google.cloud" % "google-cloud-spanner" % "0.20.0b-beta",
+//  "com.google.auth" % "google-auth-library-oauth2-http" % "0.6.0",
   "com.google.guava" % "guava" % "21.0"
 ) 
 
@@ -51,7 +52,7 @@ parallelExecution in ThisBuild := false
 
 fork in run := true
 
-val projectVersion = "0.20.0-SNAPSHOT"
+val projectVersion = "0.20.0-DF-SNAPSHOT"
 
 val noJavaDoc = Seq(
   publishArtifact in (Compile, packageDoc) := false,
@@ -153,11 +154,16 @@ lazy val dump = (project in file("dump"))
       case "META-INF/native/osx/libjansi.jnilib" => MergeStrategy.last
       case "META-INF/native/windows32/jansi.dll" => MergeStrategy.last
       case "META-INF/native/windows64/jansi.dll" => MergeStrategy.last
+      case "google/protobuf/compiler/plugin.proto" => MergeStrategy.last
+      case "google/protobuf/descriptor.proto" => MergeStrategy.last
+      case "google/protobuf/duration.proto" => MergeStrategy.last
+      case "google/protobuf/timestamp.proto" => MergeStrategy.last
       case x =>
         val oldStrategy = (assemblyMergeStrategy in assembly).value
         oldStrategy(x)
     },
-    libraryDependencies ++= scoptLibrary ++ jlineLibrary ++ scioLibraries,
-    dependencyOverrides += "com.google.cloud" % "google-cloud-spanner" % "0.20.0-beta"
+    libraryDependencies ++= scoptLibrary ++ jlineLibrary ++ scioLibraries
+//    dependencyOverrides += "io.netty" % "netty-tcnative-boringssl-static" % "1.1.33.Fork22"  // for SIGILL hack on old intel CPUs
+//    dependencyOverrides += "com.google.cloud" % "google-cloud-spanner" % "0.20.0-beta"
   ).dependsOn(core)
   .settings(noJavaDoc: _*)

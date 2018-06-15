@@ -23,7 +23,7 @@ object DataFlowDumper extends ColumnReader {
       .map {
         s =>
           (0 until numColumns).map(i => getColumn(s,i).qtext).mkString("(",",",")\n")
-      }.saveAsTextFile(s"$dataStoreBase/${table.name}.spannerdump")
+      }.saveAsTextFile(s"$dataStoreBase${if (dataStoreBase.endsWith("/")) "" else "/"}${table.name}.spannerdump")
 
     sc.close()
   }

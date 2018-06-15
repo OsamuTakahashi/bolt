@@ -117,13 +117,13 @@ object Main extends App {
 //    opt[String]('d',"database").action((x,c) => c.copy(database = Some(x)))
     opt[Unit]('t',"no-create-info").action((_, c) => c.copy(noInfo = true))
     opt[Unit]('d',"no-data").action((_, c) => c.copy(noData = true))
-    arg[String]("db_name").action((x,c) => c.copy(database = Some(x)))
-    arg[String]("table").optional().action((x,c) => c.copy(table = Some(x)))
     opt[Unit]("dataflow").optional().action((_,c) => c.copy(userDataFlow = true))
     opt[String]("datastore-base").optional().action((x,c) => c.copy(dataStoreBase = Some(x)))
     opt[String]("runner").optional().action((x,c) => c.copy(runner = x))
     opt[String]("workerMachineType").optional().action((x,c) => c.copy(workerMachineType = x))
     opt[String]("zone").optional().action((x,c) => c.copy(zone = Some(x)))
+    arg[String]("db_name").action((x,c) => c.copy(database = Some(x)))
+    arg[String]("table").optional().action((x,c) => c.copy(table = Some(x)))
   }
 
   def dumpTable(dbClient:DatabaseClient, nut:Nut, tbl:String, noInfo:Boolean, noData:Boolean,useDataFlow:Boolean,dataFlowArgs:Array[String],spannerConfig: Option[SpannerConfig]):Unit = {
