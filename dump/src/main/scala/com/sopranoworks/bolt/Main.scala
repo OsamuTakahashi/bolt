@@ -108,6 +108,7 @@ object Main extends App {
                      dataStoreBase:Option[String] = None,
                      runner:String = "DataflowRunner",
                      workerMachineType:String = "n1-standard-1",
+                     maxNumWorkers:Int = 1,
                      zone:Option[String] = None)
 
   val optParser = new scopt.OptionParser[Options]("spanner-dump") {
@@ -121,6 +122,7 @@ object Main extends App {
     opt[String]("datastore-base").optional().action((x,c) => c.copy(dataStoreBase = Some(x)))
     opt[String]("runner").optional().action((x,c) => c.copy(runner = x))
     opt[String]("workerMachineType").optional().action((x,c) => c.copy(workerMachineType = x))
+    opt[Int]("maxNumWorkers").optional().action((x,c) => c.copy(maxNumWorkers = x))
     opt[String]("zone").optional().action((x,c) => c.copy(zone = Some(x)))
     arg[String]("db_name").action((x,c) => c.copy(database = Some(x)))
     arg[String]("table").optional().action((x,c) => c.copy(table = Some(x)))
@@ -224,6 +226,7 @@ object Main extends App {
             s"--zone=${cfg.zone.get}",
             s"--runner=${cfg.runner}",
             s"--workerMachineType=${cfg.workerMachineType}",
+            s"--maxNumWorkers=${cfg.maxNumWorkers}",
             s"--output=${cfg.dataStoreBase.get}"
           )
         }
