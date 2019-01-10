@@ -152,7 +152,7 @@ object Bolt {
           val dbs = p.iterateAll().map {
             db =>
               val b= Struct.newBuilder()
-              b.add("DATABASE_NAME",SValue.string(db.getId.getDatabase)).build()
+              b.set("DATABASE_NAME").to(SValue.string(db.getId.getDatabase)).build()
           }
           ResultSets.forRows(Type.struct(List(Type.StructField.of("DATABASE_NAME",Type.string()))),dbs.asJava)
 
@@ -211,7 +211,7 @@ object Bolt {
         }.toList) ++
         List(s") ${_primaryKeyForTable(tableName).map(k => s"PRIMARY KEY ($k)").getOrElse("") }", s"${ _deleteActionForTable(tableName).getOrElse(""); };") ++
         _showCreateIndexOnTable(tableName))
-          .map(s=>Struct.newBuilder().add(tableName,SValue.string(s)).build())
+          .map(s=>Struct.newBuilder().set(tableName).to(SValue.string(s)).build())
       ResultSets.forRows(Type.struct(List(Type.StructField.of(tableName,Type.string()))),tbl)
     }
 

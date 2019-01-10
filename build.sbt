@@ -11,21 +11,21 @@ resolvers in Global += "scalaz-bintray" at "http://dl.bintray.com/scalaz/release
 val scalaLibrary = Seq("org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.6")
 
 val spannerClientLibraries = Seq(
-//  "com.google.cloud" % "google-cloud-spanner" % "0.40.0-beta",
-  "com.google.cloud" % "google-cloud-spanner" % "0.20.0b-beta",
-//  "com.google.auth" % "google-auth-library-oauth2-http" % "0.6.0",
+//  "com.google.cloud" % "google-cloud-spanner" % "0.40.0-beta",   // for library
+//  "com.google.cloud" % "google-cloud-spanner" % "0.20.0b-beta",    // for dump
+  "com.google.cloud" % "google-cloud-spanner" % "0.54.0-beta",
   "com.google.guava" % "guava" % "21.0"
 ) 
 
-val scioVersion = "0.5.1"
+val scioVersion = "0.6.1"
+val beamVersion = "2.9.0"
 
 def scioLibraries = Seq(
   "com.spotify" %% "scio-core" % scioVersion,
-  "com.spotify" %% "scio-bigquery" % scioVersion,
   "com.spotify" %% "scio-test" % scioVersion % "test",
-  "org.apache.beam" % "beam-runners-direct-java" % "2.4.0" % Test,
-  "org.apache.beam" % "beam-runners-google-cloud-dataflow-java" % "2.4.0",
-  "org.apache.beam" % "beam-sdks-java-io-google-cloud-platform" % "2.4.0"
+  "org.apache.beam" % "beam-runners-direct-java" % beamVersion % Test,
+  "org.apache.beam" % "beam-runners-google-cloud-dataflow-java" % beamVersion,
+  "org.apache.beam" % "beam-sdks-java-io-google-cloud-platform" % beamVersion
 )
 
 val loggingLibraries = Seq(
@@ -52,7 +52,7 @@ parallelExecution in ThisBuild := false
 
 fork in run := true
 
-val projectVersion = "0.20.1-DF-SNAPSHOT"
+val projectVersion = "0.21.0-SNAPSHOT"
 
 val noJavaDoc = Seq(
   publishArtifact in (Compile, packageDoc) := false,
@@ -76,7 +76,6 @@ lazy val core = (project in file("."))
       loggingLibraries ++
       testLibraries ++
       commonLibraries,
-//    dependencyOverrides += "io.netty" % "netty-tcnative-boringssl-static" % "1.1.33.Fork22",  // for SIGILL hack on old intel CPUs
     pomExtra :=
       <url>https://github.com/OsamuTakahashi/bolt</url>
         <licenses>
@@ -158,12 +157,13 @@ lazy val dump = (project in file("dump"))
       case "google/protobuf/descriptor.proto" => MergeStrategy.last
       case "google/protobuf/duration.proto" => MergeStrategy.last
       case "google/protobuf/timestamp.proto" => MergeStrategy.last
+      case PathList("com","google","bigtable", _ @ _*) => MergeStrategy.first
+      case PathList("com","twitter","algebird", _ @ _*) => MergeStrategy.last
+      case PathList("org","apache","beam","sdk","coders", _ @ _*) => MergeStrategy.last
       case x =>
         val oldStrategy = (assemblyMergeStrategy in assembly).value
         oldStrategy(x)
     },
     libraryDependencies ++= scoptLibrary ++ jlineLibrary ++ scioLibraries
-//    dependencyOverrides += "io.netty" % "netty-tcnative-boringssl-static" % "1.1.33.Fork22"  // for SIGILL hack on old intel CPUs
-//    dependencyOverrides += "com.google.cloud" % "google-cloud-spanner" % "0.20.0-beta"
   ).dependsOn(core)
   .settings(noJavaDoc: _*)
