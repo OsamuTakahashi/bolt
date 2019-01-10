@@ -57,11 +57,12 @@ class DatabaseImpl(dbClient:DatabaseClient) extends Database {
     var idxForTbl = Map.empty[String,List[Index]]
     indexes.foreach(kv=>idxForTbl += kv._2._1 -> (Index(kv._1._2, kv._2._2.sortWith(_.position < _.position)) :: idxForTbl.getOrElse(kv._2._1,Nil)))
 
-    _tables = tables.map {
+    _tables = tables.flatMap {
       kv=>
         val tbl = kv._1
         val idx = idxForTbl.get(tbl)
-        tbl->Table(dbClient,tbl,kv._2.sortWith(_.position < _.position),idx.flatMap(_.find(_.name == "PRIMARY_KEY")).get,idx.map(_.filter(_.name != "PRIMARY_KEY")).getOrElse(List()).map(i=>i.name->i).toMap)
+        idx.flatMap (_ =>
+          Some(tbl->Table(dbClient,tbl,kv._2.sortWith(_.position < _.position),idx.flatMap(_.find(_.name == "PRIMARY_KEY")).get,idx.map(_.filter(_.name != "PRIMARY_KEY")).getOrElse(List()).map(i=>i.name->i).toMap)))
     }
     _logger.info(s"Getting information schema done")
   }
