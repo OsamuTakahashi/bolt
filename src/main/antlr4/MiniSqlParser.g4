@@ -264,7 +264,7 @@ array_expression
 array_value
         returns [ Value v = null ]
         locals [ List<Value> valueList = new ArrayList<Value>() ]
-        : '(' expression { $valueList.add($expression.v); } (',' { $valueList.add($expression.v); } )* ')'
+        : '(' expression { $valueList.add($expression.v); } (',' expression { $valueList.add($expression.v); } )* ')'
         ;
 
 
