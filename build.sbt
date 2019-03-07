@@ -17,7 +17,7 @@ val spannerClientLibraries = Seq(
   "com.google.guava" % "guava" % "21.0"
 ) 
 
-val scioVersion = "0.6.1"
+val scioVersion = "0.7.0"
 val beamVersion = "2.9.0"
 
 def scioLibraries = Seq(
@@ -52,7 +52,7 @@ parallelExecution in ThisBuild := false
 
 fork in run := true
 
-val projectVersion = "0.21.0-SNAPSHOT"
+val projectVersion = "0.21.1-SNAPSHOT"
 
 val noJavaDoc = Seq(
   publishArtifact in (Compile, packageDoc) := false,

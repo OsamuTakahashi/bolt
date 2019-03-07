@@ -96,9 +96,6 @@ object Main extends App {
       resultSet.close()
     }
   }
-<<<<<<< HEAD
-  case class Options(projectId:Option[String] = None,instanceName:Option[String] = None,database:Option[String] = None,table:Option[String] = None,password:Option[String] = None,sqls:Seq[File] = Seq.empty[File],noData:Boolean = false,where:Option[String] = None)
-=======
   case class Options(projectId:Option[String] = None,
                      instanceName:Option[String] = None,
                      database:Option[String] = None,
@@ -113,7 +110,6 @@ object Main extends App {
                      workerMachineType:String = "n1-standard-1",
                      maxNumWorkers:Int = 1,
                      zone:Option[String] = None)
->>>>>>> dataflow
 
   val optParser = new scopt.OptionParser[Options]("spanner-dump") {
     opt[String]('p',"projectId").action((x,c) => c.copy(projectId = Some(x)))
@@ -122,31 +118,16 @@ object Main extends App {
 //    opt[String]('d',"database").action((x,c) => c.copy(database = Some(x)))
     opt[Unit]('t',"no-create-info").action((_, c) => c.copy(noInfo = true))
     opt[Unit]('d',"no-data").action((_, c) => c.copy(noData = true))
-<<<<<<< HEAD
-    opt[String]('w',"where").optional().action((x,c) => c.copy(where = Some(x)))
-=======
     opt[Unit]("dataflow").optional().action((_,c) => c.copy(userDataFlow = true))
     opt[String]("datastore-base").optional().action((x,c) => c.copy(dataStoreBase = Some(x)))
     opt[String]("runner").optional().action((x,c) => c.copy(runner = x))
     opt[String]("workerMachineType").optional().action((x,c) => c.copy(workerMachineType = x))
     opt[Int]("maxNumWorkers").optional().action((x,c) => c.copy(maxNumWorkers = x))
     opt[String]("zone").optional().action((x,c) => c.copy(zone = Some(x)))
->>>>>>> dataflow
     arg[String]("db_name").action((x,c) => c.copy(database = Some(x)))
     arg[String]("table").optional().action((x,c) => c.copy(table = Some(x)))
   }
 
-<<<<<<< HEAD
-  def dumpTable(dbClient:DatabaseClient, nut:Nut, tbl:String, noData:Boolean,where:Option[String]):Unit = {
-    makeResult(nut.showCreateTable(tbl)).foreach(row=>println(row.map(_.init.tail).mkString("")))
-    var loop = !noData
-    var offset = 0
-    while(loop) {
-      val r = makeResult(dbClient.singleUse().executeQuery(Statement.of(s"SELECT * from $tbl ${where.map(w=>s"WHERE $w").getOrElse("")} LIMIT 100 OFFSET $offset")))
-      if (r.nonEmpty) {
-        println(s"INSERT INTO $tbl VALUES")
-        println(r.map(row => s"  (${row.mkString(",")})").mkString(",\n") + ";")
-=======
   def dumpTable(dbClient:DatabaseClient, nut:Nut, tbl:String, noInfo:Boolean, noData:Boolean,useDataFlow:Boolean,dataFlowArgs:Array[String],spannerConfig: Option[SpannerConfig]):Unit = {
     if (!noInfo) {
       makeResult(nut.showCreateTable(tbl)).foreach(row => println(row.map(_.init.tail).mkString("")))
@@ -166,7 +147,6 @@ object Main extends App {
           loop = r.length == 100
           offset += 100
         }
->>>>>>> dataflow
       }
     }
   }
@@ -259,20 +239,12 @@ object Main extends App {
 
       cfg.table match {
         case Some(tbl) =>
-<<<<<<< HEAD
-          dumpTable(dbClient,nut,tbl,cfg.noData,cfg.where)
-=======
           dumpTable(dbClient,nut,tbl,cfg.noInfo,cfg.noData,cfg.userDataFlow,dataFlowArgs,spannerConfig)
->>>>>>> dataflow
         case None =>
 //          val tbls = makeResult(dbClient.singleUse().executeQuery(Statement.of("SELECT TABLE_NAME,PARENT_TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA=\"\"")))
 //          tbls.foreach(tbl=>dumpTable(dbClient,nut,tbl.head.init.tail))
           val tbls = tableDependencyList(dbClient)
-<<<<<<< HEAD
-          tbls.foreach(tbl=>dumpTable(dbClient,nut,tbl,cfg.noData,cfg.where))
-=======
           tbls.foreach(tbl=>dumpTable(dbClient,nut,tbl,cfg.noInfo,cfg.noData,cfg.userDataFlow,dataFlowArgs,spannerConfig))
->>>>>>> dataflow
       }
       spanner.close()
     case None =>
