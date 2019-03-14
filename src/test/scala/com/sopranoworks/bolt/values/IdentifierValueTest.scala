@@ -20,9 +20,9 @@ class IdentifierValueTest extends Specification {
 
     override def executeNativeQuery(sql: String): ResultSet = {
       val sb = Struct.newBuilder()
-      sb.add("ONE",SValue.int64(1))
-      sb.add("TWO",SValue.int64(2))
-      sb.add("THREE",SValue.int64(2))
+      sb.set("ONE").to(SValue.int64(1))
+      sb.set("TWO").to(SValue.int64(2))
+      sb.set("THREE").to(SValue.int64(2))
 
       ResultSets.forRows(Type.struct(List(Type.StructField.of("ONE",Type.int64()),Type.StructField.of("TWO",Type.int64()),Type.StructField.of("THREE",Type.int64()) )),List(sb.build()))
     }

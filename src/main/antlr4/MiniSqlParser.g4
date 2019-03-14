@@ -242,6 +242,7 @@ bool_expression returns [ Value v = null ]
         | function { $v = $function.v; }
         | ID { $v = (qc == null) ? new IdentifierValue($ID.text,qc) : qc.identifier($ID.text); }
         | field_path { $v = $field_path.v; }
+        | '(' bool_expression ')' { $v = $bool_expression.v; }
         ;
 
 array_expression

@@ -683,6 +683,12 @@ class MiniSqlParserTest extends Specification {
       parser.minisql()
       nut.queryString must_== sql
     }
+    "SELECT item_id, SUM(CAST (price AS FLOAT64)), item_type FROM item_table WHERE item_sub_id IS NOT NULL AND (item_count > 0 OR back_order IS NOT NULL) AND item_id IN (101,102,103,104) GROUP BY item_id, item_type" in {
+      val sql = "SELECT item_id, SUM(CAST (price AS FLOAT64)), item_type FROM item_table WHERE item_sub_id IS NOT NULL AND (item_count > 0 OR back_order IS NOT NULL) AND item_id IN (101,102,103,104)"// GROUP BY item_id, item_type"
+      val (parser, nut) = _createParser(sql)
+      parser.minisql()
+      nut.queryString must_== sql
+    }
   }
   "INSERT" should {
     "INSERT INTO test_tbl VALUES(3, IF( (select count from test_tbl where id=2) > 0, 1, 0))" in {
