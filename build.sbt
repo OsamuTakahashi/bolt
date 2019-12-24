@@ -17,8 +17,8 @@ val spannerClientLibraries = Seq(
   "com.google.guava" % "guava" % "21.0"
 ) 
 
-val scioVersion = "0.7.0"
-val beamVersion = "2.9.0"
+val scioVersion = "0.7.4"
+val beamVersion = "2.16.0"
 
 def scioLibraries = Seq(
   "com.spotify" %% "scio-core" % scioVersion,
@@ -52,7 +52,7 @@ parallelExecution in ThisBuild := false
 
 fork in run := true
 
-val projectVersion = "0.21.3-SNAPSHOT"
+val projectVersion = "0.21.4-SNAPSHOT"
 
 val noJavaDoc = Seq(
   publishArtifact in (Compile, packageDoc) := false,
@@ -157,7 +157,11 @@ lazy val dump = (project in file("dump"))
       case "google/protobuf/descriptor.proto" => MergeStrategy.last
       case "google/protobuf/duration.proto" => MergeStrategy.last
       case "google/protobuf/timestamp.proto" => MergeStrategy.last
+      case "google/protobuf/any.proto" => MergeStrategy.first
+      case "google/protobuf/field_mask.proto" => MergeStrategy.first
+      case "google/protobuf/wrappers.proto" => MergeStrategy.first
       case PathList("com","google","bigtable", _ @ _*) => MergeStrategy.first
+      case PathList("com","google","cloud","bigtable", _ @ _*) => MergeStrategy.first
       case PathList("com","twitter","algebird", _ @ _*) => MergeStrategy.last
       case PathList("org","apache","beam","sdk","coders", _ @ _*) => MergeStrategy.last
       case x =>
