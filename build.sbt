@@ -11,14 +11,12 @@ resolvers in Global += "scalaz-bintray" at "http://dl.bintray.com/scalaz/release
 val scalaLibrary = Seq("org.scala-lang.modules" %% "scala-parser-combinators" % "1.1.2")
 
 val spannerClientLibraries = Seq(
-//  "com.google.cloud" % "google-cloud-spanner" % "0.40.0-beta",   // for library
-//  "com.google.cloud" % "google-cloud-spanner" % "0.20.0b-beta",    // for dump
-  "com.google.cloud" % "google-cloud-spanner" % "1.54.0"
-//  "com.google.guava" % "guava" % "21.0"
-) 
+//  "com.google.cloud" % "google-cloud-spanner" % "2.0.2"
+  "com.google.cloud" % "google-cloud-spanner" % "6.3.3"
+)
 
-val scioVersion = "0.9.0"
-val beamVersion = "2.20.0"
+val scioVersion = "0.10.2"
+val beamVersion = "2.28.0"
 
 def scioLibraries = Seq(
   "com.spotify" %% "scio-core" % scioVersion,
@@ -52,7 +50,7 @@ parallelExecution in ThisBuild := false
 
 fork in run := true
 
-val projectVersion = "0.22-SNAPSHOT"
+val projectVersion = "0.22.1-SNAPSHOT"
 
 val noJavaDoc = Seq(
   publishArtifact in (Compile, packageDoc) := false,
