@@ -2,6 +2,10 @@
 
 The wrapper library for executing INSERT/UPDATE/DELETE sql query on Google Cloud Spanner.
 
+### Notice: Scala 2.11 support expired
+
+From version 0.22, Bolt does not support Scala 2.11 due to dependent libraries.
+
 ### INSERT/UPDATE/DELETE Syntax
 
 #### INSERT

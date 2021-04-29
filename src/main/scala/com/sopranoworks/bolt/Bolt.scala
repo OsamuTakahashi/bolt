@@ -110,8 +110,13 @@ object Bolt {
       Option(admin) match {
         case Some(a) =>
           val op = a.adminClient.updateDatabaseDdl(a.instance,a.databaes,List(sql),null)
-          op.waitFor().getResult
-          Database.reloadWith(dbClient)
+          try {
+            op.get()
+            Database.reloadWith(dbClient)
+          } catch {
+            case e : Exception =>
+              _logger.error(s"Executing administrator query failure with:${e.getMessage}")
+          }
         case None =>
           _logger.warn("Could not execute administrator query")
       }
@@ -126,8 +131,15 @@ object Bolt {
     def createDatabase(admin:Admin,instanceId:String,databaseName:String):Boolean = {
       (Option(admin),Option(instanceId)) match {
         case (Some(adm),Some(iid)) =>
-          val r = adm.adminClient.createDatabase(iid,databaseName,List.empty[String].asJava).waitFor()
-          r.isSuccessful
+          val r = adm.adminClient.createDatabase(iid,databaseName,List.empty[String].asJava)
+          try {
+            r.get()
+            true
+          } catch {
+            case e : Exception =>
+              _logger.error(s"Executing administrator query failure with:${e.getMessage}")
+              false
+          }
         case _ =>
           false
       }

@@ -146,7 +146,7 @@ object Main extends App {
 
       var admin = Admin(spanner.getDatabaseAdminClient,instance,dbName.orNull)
       if (cfg.createDatabase && admin != null) {
-        admin.adminClient.createDatabase(instance,dbName.get,List.empty[String].asJava).waitFor()
+        admin.adminClient.createDatabase(instance,dbName.get,List.empty[String].asJava).get()
       }
 
       var dbClient = dbName.map(dbn=>spanner.getDatabaseClient(DatabaseId.of(options.getProjectId, instance, dbn))).orNull

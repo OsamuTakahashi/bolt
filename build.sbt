@@ -1,24 +1,24 @@
 import sbt.Keys._
 
-val projectScalaVersion = "2.11.8"
+val projectScalaVersion = "2.12.9"
 
-val scalaVersions = Seq("2.11.8", "2.12.2")
+val scalaVersions = Seq("2.12.9")
 
 resolvers in Global += "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots"
 
 resolvers in Global += "scalaz-bintray" at "http://dl.bintray.com/scalaz/releases"
 
-val scalaLibrary = Seq("org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.6")
+val scalaLibrary = Seq("org.scala-lang.modules" %% "scala-parser-combinators" % "1.1.2")
 
 val spannerClientLibraries = Seq(
 //  "com.google.cloud" % "google-cloud-spanner" % "0.40.0-beta",   // for library
 //  "com.google.cloud" % "google-cloud-spanner" % "0.20.0b-beta",    // for dump
-  "com.google.cloud" % "google-cloud-spanner" % "0.54.0-beta",
-  "com.google.guava" % "guava" % "21.0"
+  "com.google.cloud" % "google-cloud-spanner" % "1.54.0"
+//  "com.google.guava" % "guava" % "21.0"
 ) 
 
-val scioVersion = "0.7.4"
-val beamVersion = "2.16.0"
+val scioVersion = "0.9.0"
+val beamVersion = "2.20.0"
 
 def scioLibraries = Seq(
   "com.spotify" %% "scio-core" % scioVersion,
@@ -35,8 +35,8 @@ val loggingLibraries = Seq(
 val scoptLibrary = Seq("com.github.scopt" %% "scopt" % "3.5.0")
 
 val testLibraries = Seq(
-  "org.specs2" %% "specs2-core" % "3.8.9" % "test",
-  "org.specs2" %% "specs2-mock" % "3.8.9" % "test",
+  "org.specs2" %% "specs2-core" % "4.6.0" % "test",
+  "org.specs2" %% "specs2-mock" % "4.6.0" % "test",
   "com.typesafe" % "config" % "1.3.1" % "test"
 )
 
@@ -52,7 +52,7 @@ parallelExecution in ThisBuild := false
 
 fork in run := true
 
-val projectVersion = "0.21.4-SNAPSHOT"
+val projectVersion = "0.22-SNAPSHOT"
 
 val noJavaDoc = Seq(
   publishArtifact in (Compile, packageDoc) := false,
@@ -121,6 +121,7 @@ lazy val client = (project in file("client"))
       case "META-INF/native/osx/libjansi.jnilib" => MergeStrategy.last
       case "META-INF/native/windows32/jansi.dll" => MergeStrategy.last
       case "META-INF/native/windows64/jansi.dll" => MergeStrategy.last
+      case "module-info.class" => MergeStrategy.last
       case x =>
         val oldStrategy = (assemblyMergeStrategy in assembly).value
         oldStrategy(x)
@@ -153,6 +154,7 @@ lazy val dump = (project in file("dump"))
       case "META-INF/native/osx/libjansi.jnilib" => MergeStrategy.last
       case "META-INF/native/windows32/jansi.dll" => MergeStrategy.last
       case "META-INF/native/windows64/jansi.dll" => MergeStrategy.last
+      case "META-INF/native-image/io.netty/transport/reflection-config.json" => MergeStrategy.last
       case "google/protobuf/compiler/plugin.proto" => MergeStrategy.last
       case "google/protobuf/descriptor.proto" => MergeStrategy.last
       case "google/protobuf/duration.proto" => MergeStrategy.last
@@ -160,10 +162,18 @@ lazy val dump = (project in file("dump"))
       case "google/protobuf/any.proto" => MergeStrategy.first
       case "google/protobuf/field_mask.proto" => MergeStrategy.first
       case "google/protobuf/wrappers.proto" => MergeStrategy.first
+      case "module-info.class" => MergeStrategy.first
+      case "mozilla/public-suffix-list.txt" => MergeStrategy.first
+      case PathList("google", "api", _ @ _ *) => MergeStrategy.last
+      case PathList("google", "type", _ @ _ *) => MergeStrategy.last
+      case PathList("google", "cloud", _ @ _ *) => MergeStrategy.last
       case PathList("com","google","bigtable", _ @ _*) => MergeStrategy.first
       case PathList("com","google","cloud","bigtable", _ @ _*) => MergeStrategy.first
+      case PathList("com","google","protobuf", _ @ _ *) => MergeStrategy.first
       case PathList("com","twitter","algebird", _ @ _*) => MergeStrategy.last
       case PathList("org","apache","beam","sdk","coders", _ @ _*) => MergeStrategy.last
+      case PathList(ps @ _ *) if ps.last.endsWith(".proto") => MergeStrategy.last
+      case PathList(ps @ _ *) if ps.last == "native-image.properties" => MergeStrategy.last
       case x =>
         val oldStrategy = (assemblyMergeStrategy in assembly).value
         oldStrategy(x)
