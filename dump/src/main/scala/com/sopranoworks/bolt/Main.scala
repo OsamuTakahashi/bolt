@@ -109,7 +109,7 @@ object Main extends App {
                      runner:String = "DataflowRunner",
                      workerMachineType:String = "n1-standard-1",
                      maxNumWorkers:Int = 1,
-                     zone:Option[String] = None)
+                     region:Option[String] = None)
 
   val optParser = new scopt.OptionParser[Options]("spanner-dump") {
     opt[String]('p',"projectId").action((x,c) => c.copy(projectId = Some(x)))
@@ -123,7 +123,7 @@ object Main extends App {
     opt[String]("runner").optional().action((x,c) => c.copy(runner = x))
     opt[String]("workerMachineType").optional().action((x,c) => c.copy(workerMachineType = x))
     opt[Int]("maxNumWorkers").optional().action((x,c) => c.copy(maxNumWorkers = x))
-    opt[String]("zone").optional().action((x,c) => c.copy(zone = Some(x)))
+    opt[String]("region").optional().action((x,c) => c.copy(region = Some(x)))
     arg[String]("db_name").action((x,c) => c.copy(database = Some(x)))
     arg[String]("table").optional().action((x,c) => c.copy(table = Some(x)))
   }
@@ -207,15 +207,11 @@ object Main extends App {
       }
       var spannerConfig:Option[SpannerConfig] = None
       val dataFlowArgs = if (cfg.userDataFlow) {
-        if (cfg.projectId.isEmpty || cfg.dataStoreBase.isEmpty || cfg.zone.isEmpty) {
+        if (cfg.projectId.isEmpty || cfg.dataStoreBase.isEmpty || cfg.region.isEmpty) {
           optParser.showUsage()
           System.exit(1)
           Array.empty[String]
         } else {
-//          val scfg = new TrueSpannerConfig//SpannerConfig.create()
-//          scfg.projectId = cfg.projectId.get
-//          scfg.instanceId = cfg.instanceName.get
-//          scfg.databaseId = cfg.database.get
           spannerConfig = Some(SpannerConfig.create()
             .withProjectId(cfg.projectId.get)
             .withInstanceId(cfg.instanceName.get)
@@ -223,7 +219,7 @@ object Main extends App {
 
           Array(
             s"--project=${cfg.projectId.get}",
-            s"--zone=${cfg.zone.get}",
+            s"--region=${cfg.region.get}",
             s"--runner=${cfg.runner}",
             s"--workerMachineType=${cfg.workerMachineType}",
             s"--maxNumWorkers=${cfg.maxNumWorkers}",
@@ -241,8 +237,6 @@ object Main extends App {
         case Some(tbl) =>
           dumpTable(dbClient,nut,tbl,cfg.noInfo,cfg.noData,cfg.userDataFlow,dataFlowArgs,spannerConfig)
         case None =>
-//          val tbls = makeResult(dbClient.singleUse().executeQuery(Statement.of("SELECT TABLE_NAME,PARENT_TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA=\"\"")))
-//          tbls.foreach(tbl=>dumpTable(dbClient,nut,tbl.head.init.tail))
           val tbls = tableDependencyList(dbClient)
           tbls.foreach(tbl=>dumpTable(dbClient,nut,tbl,cfg.noInfo,cfg.noData,cfg.userDataFlow,dataFlowArgs,spannerConfig))
       }
