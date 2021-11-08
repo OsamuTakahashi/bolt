@@ -90,7 +90,7 @@ case class CastValue(expression:Value,toType:Type) extends Value with WrappedVal
           }
         case tp if tp == Type.bytes() =>
           expression.eval.asValue match {
-            case v:StringValue => _ref = Some(BytesValue(v.text))
+            case v:StringValue => _ref = Some(BytesValue(v.text.getBytes))
             case v:BytesValue => _ref = Some(v)
             case v =>
               throw new RuntimeException(s"Can not convert value from ${v.text} to $tp")
@@ -175,7 +175,7 @@ object CastValue {
         }
       case tp if tp == Type.bytes() =>
         from match {
-          case v:StringValue => Some(BytesValue(v.text))
+          case v:StringValue => Some(BytesValue(v.text.getBytes))
           case v:BytesValue => Some(v)
           case v =>
             None

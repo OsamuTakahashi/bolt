@@ -12,9 +12,9 @@
 package com.sopranoworks.bolt
 
 import java.io.{File, FileInputStream}
-
 import com.google.auth.oauth2.GoogleCredentials
 import com.google.cloud.spanner._
+import com.sopranoworks.bolt.values.BytesValue
 import org.apache.beam.sdk.io.gcp.spanner.SpannerConfig
 import org.apache.commons.text.StringEscapeUtils
 
@@ -65,6 +65,8 @@ object Main extends App {
                     r.getDouble(i).toString
                   case v if v == Type.string() =>
                     escapedString(r.getString(i))
+                  case v if v == Type.bytes() =>
+                    s"'${BytesValue(r.getBytes(i).toByteArray).text}'"
                   case v if v == Type.timestamp() =>
                     s"'${r.getTimestamp(i).toString}'"
                   case v if v == Type.date() =>

@@ -37,7 +37,8 @@ trait ColumnReader {
           TimestampValue(st.getTimestamp(idx).toString)
         case v if v == Type.date() =>
           DateValue(st.getDate(idx).toString)
-  //      case v if v == Type.bytes() =>
+        case v if v == Type.bytes() =>
+          BytesValue(st.getBytes(idx).toByteArray)
         case v if v == Type.array(Type.bool()) =>
           ArrayValue(st.getBooleanArray(idx).map(b=>BooleanValue(b).asValue).toList.asJava,true,Type.bool())
         case v if v == Type.array(Type.int64()) =>

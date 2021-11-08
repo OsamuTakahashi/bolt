@@ -169,6 +169,14 @@ object DoubleValue {
   def apply(v:Double):DoubleValue = new DoubleValue(v)
 }
 
-case class BytesValue(text:String) extends Value with LiteralValue {
+case class BytesValue(bytes:Array[Byte]) extends Value with LiteralValue {
+  private def escapedBytes:String =
+    bytes.map(b => "\\x%02x".format(b)).mkString("")
+
+  def text = escapedBytes
+
+  override def qtext:String = s"'$escapedBytes'"
   override def spannerType: Type = Type.bytes()
+  override def isEqualValue(v:Value):Boolean =
+    v.isInstanceOf[BytesValue] && (v.asInstanceOf[BytesValue].bytes sameElements bytes)
 }
