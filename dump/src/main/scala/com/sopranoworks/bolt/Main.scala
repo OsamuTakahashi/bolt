@@ -156,18 +156,9 @@ object Main extends App {
   def tableDependencyList(dbClient:DatabaseClient):List[String] = {
     var res = List.empty[String]
     var tableSet = Set.empty[String]
-    var tbls = dbClient.singleUse().executeQuery(Statement.of("SELECT TABLE_NAME,PARENT_TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA=\"\""))
+    val tbls = dbClient.singleUse().executeQuery(Statement.of("SELECT TABLE_NAME,PARENT_TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA=\"\""))
       .autoclose(_.map(res=>(res.getString(0),res.getStringOpt("PARENT_TABLE_NAME"))).toList)
-      .sortWith((a,b) => (a._2,b._2) match {
-      case (Some(aa),Some(bb)) =>
-        aa.compareTo(bb) < 0
-      case (None,Some(_)) =>
-        true
-      case (None,None) =>
-        true
-      case (Some(_),None) =>
-        false
-    })
+      .sortWith((a,b) => a._2.getOrElse("").compareTo(b._2.getOrElse("")) < 0)
 
     var last = 0
 

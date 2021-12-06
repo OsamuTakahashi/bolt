@@ -49,11 +49,11 @@ val commonLibraries = Seq(
 
 val jlineLibrary = Seq("jline" % "jline" % "2.14.3")
 
-parallelExecution in ThisBuild := false
+ThisBuild / parallelExecution := false
 
 fork in run := true
 
-val projectVersion = "0.23.0-SNAPSHOT"
+val projectVersion = "0.23.1-SNAPSHOT"
 
 val noJavaDoc = Seq(
   publishArtifact in (Compile, packageDoc) := false,
