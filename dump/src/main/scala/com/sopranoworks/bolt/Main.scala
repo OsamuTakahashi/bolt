@@ -188,20 +188,20 @@ object Main extends App {
       val spanner = options.getService
       val instance = cfg.instanceName.getOrElse {
         println("Instance name must be specified")
-        optParser.showUsage()
+        println(optParser.usage)
         System.exit(1)
         ""
       }
       var dbName = cfg.database.getOrElse {
         println("Database name must be specified")
-        optParser.showUsage()
+        println(optParser.usage)
         System.exit(1)
         ""
       }
       var spannerConfig:Option[SpannerConfig] = None
       val dataFlowArgs = if (cfg.userDataFlow) {
         if (cfg.projectId.isEmpty || cfg.dataStoreBase.isEmpty || cfg.region.isEmpty) {
-          optParser.showUsage()
+          println(optParser.usage)
           System.exit(1)
           Array.empty[String]
         } else {

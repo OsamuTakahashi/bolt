@@ -98,18 +98,10 @@ nut.executeQuery("INSERT INTO TEST_TABLE (ID,NAME) VALUES(101,'test');");
 
 This project also contains console spanner client application, spanne-cli.
 
-dist/spanner-cli-0.15-SNAPSHOT.zip
-
-MD5:c1005e19f6456d6af1c659295b86ac0b
-
 ### spanner-dump
 
 This is a bonus program.
 It will dump a spanner database to sql text code.
-
-dist/spanner-dump-0.15-SNAPSHOT.zip
-
-MD5:7a6f628d6f4ddf34ac51f5c6f9534662
 
 ## Notice
 
@@ -127,7 +119,7 @@ You must create a instance per thread.
 There is no such a limitation in SELECT and subquery.
 
 * Referencing outside (INSERT/UPDATE statement's) alias in subquery is not supported in an INSERT/UPDATE query.
-* Some lterals are currently not supported.
+* Some literals are currently not supported.
 
 ## Licence
 

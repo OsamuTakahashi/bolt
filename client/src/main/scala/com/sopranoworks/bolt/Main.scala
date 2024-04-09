@@ -25,7 +25,7 @@ import scala.collection.JavaConverters._
   */
 object Main extends App {
   import Bolt._
-  def spannerOptions(config:Options) = {
+  private def spannerOptions(config:Options) = {
     val options = SpannerOptions.newBuilder()
 
     config.password.foreach {
@@ -35,6 +35,9 @@ object Main extends App {
         options.setCredentials(GoogleCredentials.fromStream(is))
     }
     config.projectId.foreach(options.setProjectId)
+    if (config.local) {
+      options.setEmulatorHost("localhost:9010")
+    }
     options.build()
   }
 
@@ -120,7 +123,7 @@ object Main extends App {
     }
   }
 
-  case class Options(projectId:Option[String] = None,instanceName:Option[String] = None,database:Option[String] = None,createDatabase:Boolean = false,password:Option[String] = None,sqls:Option[String] = None)
+  case class Options(projectId:Option[String] = None,instanceName:Option[String] = None,database:Option[String] = None,createDatabase:Boolean = false,password:Option[String] = None,sqls:Option[String] = None,local:Boolean = false)
 
   val optParser = new scopt.OptionParser[Options]("spanner-cli") {
     opt[String]('p',"projectId").action((x,c) => c.copy(projectId = Some(x)))
@@ -128,6 +131,7 @@ object Main extends App {
     opt[String]('s',"secret").action((x,c) => c.copy(password = Some(x)))
     opt[String]('e',"execute").action((x,c) => c.copy(sqls = Some(x)))
     opt[Unit]('c',"create").action((_,c) => c.copy(createDatabase = true))
+    opt[Unit]('l',"local").action((_,c) => c.copy(local = true))
     arg[String]("database").optional().action((x,c) => c.copy(database = Some(x)))
   }
 
@@ -137,7 +141,7 @@ object Main extends App {
       val spanner = options.getService
       val instance = cfg.instanceName.getOrElse {
         println("Instance name must be specified")
-        optParser.showUsage()
+        println(optParser.usage)
         System.exit(1)
         ""
       }

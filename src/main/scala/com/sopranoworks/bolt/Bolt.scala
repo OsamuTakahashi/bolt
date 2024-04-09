@@ -156,6 +156,8 @@ object Bolt {
     def showColumns(table:String):ResultSet =
       dbClient.singleUse().executeQuery(Statement.of(s"SELECT COLUMN_NAME,SPANNER_TYPE,IS_NULLABLE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='$table' ORDER BY ORDINAL_POSITION"))
 
+    def showSequences():ResultSet =
+      dbClient.singleUse().executeQuery(Statement.of(s"SELECT NAME,DATA_TYPE FROM INFORMATION_SCHEMA.SEQUENCES"))
 
     def showDatabases(admin:Admin,instanceId:String):ResultSet = {
       (Option(admin),Option(instanceId)) match {

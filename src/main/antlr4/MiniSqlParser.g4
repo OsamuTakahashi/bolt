@@ -473,6 +473,7 @@ table_alteration
 drop_stmt
         : DROP TABLE ID
         | DROP INDEX ID
+        | DROP SEQUENCE ID
         ;
 
 show_stmt returns [ ResultSet resultSet = null ]
@@ -482,6 +483,9 @@ show_stmt returns [ ResultSet resultSet = null ]
             } else
             if ($ID.text.equalsIgnoreCase("DATABASES")) {
               $resultSet = nut.showDatabases(admin,instanceId);
+            } else
+            if ($ID.text.equalsIgnoreCase("SEQUENCES")) {
+              $resultSet = nut.showSequences();
             } else {
               // exception
               throw new RuntimeException("Unknown token:" + $ID.text);

@@ -15,13 +15,13 @@ val scalaLibrary = Seq("org.scala-lang.modules" %% "scala-parser-combinators" % 
 
 val spannerClientLibraries = Seq(
 //  "com.google.cloud" % "google-cloud-spanner" % "2.0.2"
-  "com.google.cloud" % "google-cloud-spanner" % "6.3.3"
+  "com.google.cloud" % "google-cloud-spanner" % "6.63.0"
 )
 
 val scioVersion = "0.11.1"
-val beamVersion = "2.33.0"
+val beamVersion = "2.54.0"
 
-def scioLibraries = Seq(
+val scioLibraries = Seq(
   "com.spotify" %% "scio-core" % scioVersion,
   "com.spotify" %% "scio-test" % scioVersion % "test",
   "org.apache.beam" % "beam-runners-direct-java" % beamVersion % Test,
@@ -33,7 +33,7 @@ val loggingLibraries = Seq(
   "ch.qos.logback" % "logback-classic" % "1.1.7"
 )
 
-val scoptLibrary = Seq("com.github.scopt" %% "scopt" % "3.5.0")
+val scoptLibrary = Seq("com.github.scopt" %% "scopt" % "4.1.0")
 
 val testLibraries = Seq(
   "org.specs2" %% "specs2-core" % "4.6.0" % "test",
@@ -42,18 +42,19 @@ val testLibraries = Seq(
 )
 
 val commonLibraries = Seq(
-  "joda-time" % "joda-time" % "2.9.6",
-  "org.joda" % "joda-convert" % "1.8",
-  "org.apache.commons" % "commons-text" % "1.2"
+  "joda-time" % "joda-time" % "2.12.7",
+  "org.joda" % "joda-convert" % "2.2.3",
+  "org.apache.commons" % "commons-text" % "1.11.0"
 )
 
-val jlineLibrary = Seq("jline" % "jline" % "2.14.3")
+val jlineLibrary = Seq("jline" % "jline" % "2.14.6")
 
 ThisBuild / parallelExecution := false
 
 fork in run := true
 
-val projectVersion = "0.23.1-SNAPSHOT"
+//val projectVersion = "0.24.0-SNAPSHOT"
+val projectVersion = "0.24.0"
 
 val noJavaDoc = Seq(
   publishArtifact in (Compile, packageDoc) := false,
@@ -125,6 +126,8 @@ lazy val client = (project in file("client"))
       case "META-INF/native/windows32/jansi.dll" => MergeStrategy.last
       case "META-INF/native/windows64/jansi.dll" => MergeStrategy.last
       case "module-info.class" => MergeStrategy.last
+      case "META-INF/native-image/native-image.properties" => MergeStrategy.last
+      case "META-INF/versions/9/module-info.class" => MergeStrategy.last
       case x =>
         val oldStrategy = (assemblyMergeStrategy in assembly).value
         oldStrategy(x)
@@ -148,7 +151,7 @@ lazy val dump = (project in file("dump"))
         val universalMappings = (mappings in Universal).value
         val fatJar = (assembly in Compile).value
         val filtered = universalMappings filter {
-            case (file, name) =>  ! name.endsWith(".jar")
+            case (file, name) =>  ! name.endsWith(".jar") && ! file.getPath.contains("kotlin")
         }
         filtered :+ (fatJar -> ("lib/" + fatJar.getName))
     },
@@ -178,8 +181,15 @@ lazy val dump = (project in file("dump"))
       case PathList("com","google","bigtable", _ @ _*) => MergeStrategy.first
       case PathList("com","google","cloud","bigtable", _ @ _*) => MergeStrategy.first
       case PathList("com","google","protobuf", _ @ _ *) => MergeStrategy.first
+      case PathList("com","google","errorprone", _ @ _ *) => MergeStrategy.first
       case PathList("com","twitter","algebird", _ @ _*) => MergeStrategy.last
       case PathList("org","apache","beam","sdk","coders", _ @ _*) => MergeStrategy.last
+      case PathList("org","apache","commons", _ @ _*) => MergeStrategy.last
+      case PathList("com","squareup","kotlinpoet", _ @ _*) => MergeStrategy.first
+      case PathList("com","squareup","wire", _ @ _*) => MergeStrategy.last
+      case PathList("commonMain","default", _ @ _*) => MergeStrategy.last
+      case PathList("org","slf4j", _ @ _*) => MergeStrategy.last
+      case PathList("META-INF" , _ @ _*) => MergeStrategy.last
       case PathList(ps @ _ *) if ps.last.endsWith(".proto") => MergeStrategy.last
       case PathList(ps @ _ *) if ps.last == "native-image.properties" => MergeStrategy.last
       case x =>

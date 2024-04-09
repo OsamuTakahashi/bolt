@@ -154,6 +154,9 @@ ORDINAL : O R D I N A L
 SELECT  : S E L E C T
         ;
 
+SEQUENCE: S E Q U E N C E
+        ;
+
 SET     : S E T
         ;
 
@@ -395,11 +398,11 @@ CN      : ','
 DOT     : '.'
         ;
 
-AR      : '*'
-        ;
-
-MIN     : '-'
-        ;
+//AR      : '*'
+//        ;
+//
+//MIN     : '-'
+//        ;
 
 SP      : '#'
         ;
